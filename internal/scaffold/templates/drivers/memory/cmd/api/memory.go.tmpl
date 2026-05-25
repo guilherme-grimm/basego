@@ -1,0 +1,10 @@
+package main
+
+import "{{.Module}}/internal/resource/database/memory"
+
+// SetupMemory constructs the in-memory store. It cannot fail; memory is
+// always available. Returned as a pointer because gateway implementations
+// share the underlying state.
+func SetupMemory() *memory.Store {
+	return memory.NewStore()
+}

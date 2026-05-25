@@ -1,0 +1,23 @@
+package main
+
+import (
+	"context"
+	"errors"
+
+	"{{.Module}}/internal/resource/database/mongo"
+)
+
+// SetupMongo dials MongoDB using the configured URI and database. The real
+// driver dependency lands in a follow-up; the signature is fixed now so
+// services.go can be generated against it.
+func SetupMongo(_ context.Context, _ MongoConfig) (*mongo.Client, error) {
+	return nil, errors.New("mongo setup not implemented yet")
+}
+
+// MongoConfig mirrors the resources.mongo block in config.yaml. Resolved
+// from Viper in a later deliverable; declared here so the setup signature
+// is stable across PRs.
+type MongoConfig struct {
+	URI      string
+	Database string
+}

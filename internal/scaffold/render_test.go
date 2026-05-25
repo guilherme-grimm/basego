@@ -8,48 +8,138 @@ import (
 	"github.com/guilherme-grimm/basego/internal/scaffold"
 )
 
-func TestRender_ProducesExpectedFiles(t *testing.T) {
+// baseFiles are emitted regardless of driver selection.
+var baseFiles = []string{
+	".gitattributes",
+	".gitignore",
+	"README.md",
+	"cmd/api/main.go",
+	"cmd/api/memory.go",
+	"config/config.yaml",
+	"go.mod",
+	"internal/api/health.go",
+	"internal/api/health_test.go",
+	"internal/api/router.go",
+	"internal/resource/database/memory/store.go",
+}
+
+func TestRender_DriverMatrix(t *testing.T) {
 	t.Parallel()
-	req := &scaffold.CreateRequest{
-		Name:    "demo",
-		Module:  "example.com/demo",
-		Drivers: []string{"memory"},
+	tests := []struct {
+		name    string
+		drivers []string
+		extra   []string // files added on top of baseFiles
+	}{
+		{"memory only", []string{"memory"}, nil},
+		{"with mongo", []string{"memory", "mongo"}, []string{
+			"cmd/api/mongo.go",
+			"internal/resource/database/mongo/client.go",
+		}},
+		{"with postgres", []string{"memory", "postgres"}, []string{
+			"cmd/api/postgres.go",
+			"internal/resource/database/postgres/client.go",
+		}},
+		{"with both", []string{"memory", "mongo", "postgres"}, []string{
+			"cmd/api/mongo.go",
+			"cmd/api/postgres.go",
+			"internal/resource/database/mongo/client.go",
+			"internal/resource/database/postgres/client.go",
+		}},
 	}
-	plan, err := scaffold.Render(req)
-	if err != nil {
-		t.Fatalf("Render: %v", err)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			req := &scaffold.CreateRequest{
+				Name:    "demo",
+				Module:  "example.com/demo",
+				Drivers: tc.drivers,
+			}
+			plan, err := scaffold.Render(req)
+			if err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+
+			var got []string
+			for _, f := range plan.Files {
+				got = append(got, f.Path)
+			}
+			sort.Strings(got)
+
+			want := append([]string{}, baseFiles...)
+			want = append(want, tc.extra...)
+			sort.Strings(want)
+
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Errorf("files mismatch:\n got:  %v\n want: %v", got, want)
+			}
+		})
 	}
-	if plan.Target != "demo" {
-		t.Errorf("Target = %q, want %q", plan.Target, "demo")
+}
+
+func TestRender_ConfigYAMLContainsSelectedResources(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		drivers     []string
+		mustContain []string
+		mustNot     []string
+	}{
+		{
+			"memory only — no resources block",
+			[]string{"memory"},
+			nil,
+			[]string{"resources:", "mongo:", "postgres:"},
+		},
+		{
+			"mongo only",
+			[]string{"memory", "mongo"},
+			[]string{"resources:", "mongo:", "uri: mongodb://"},
+			[]string{"postgres:"},
+		},
+		{
+			"both",
+			[]string{"memory", "mongo", "postgres"},
+			[]string{"mongo:", "postgres:", "dsn: postgres://"},
+			nil,
+		},
 	}
-	got := map[string][]byte{}
-	for _, f := range plan.Files {
-		got[f.Path] = f.Content
-	}
-	wantPaths := []string{
-		".gitattributes",
-		".gitignore",
-		"README.md",
-		"cmd/api/main.go",
-		"config/config.yaml",
-		"go.mod",
-		"internal/api/health.go",
-		"internal/api/health_test.go",
-		"internal/api/router.go",
-	}
-	var gotPaths []string
-	for p := range got {
-		gotPaths = append(gotPaths, p)
-	}
-	sort.Strings(gotPaths)
-	if strings.Join(gotPaths, ",") != strings.Join(wantPaths, ",") {
-		t.Errorf("files mismatch:\n got:  %v\n want: %v", gotPaths, wantPaths)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: tc.drivers}
+			plan, err := scaffold.Render(req)
+			if err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			var yaml string
+			for _, f := range plan.Files {
+				if f.Path == "config/config.yaml" {
+					yaml = string(f.Content)
+					break
+				}
+			}
+			if yaml == "" {
+				t.Fatal("config/config.yaml not in plan")
+			}
+			for _, s := range tc.mustContain {
+				if !strings.Contains(yaml, s) {
+					t.Errorf("config.yaml missing %q\n---\n%s", s, yaml)
+				}
+			}
+			for _, s := range tc.mustNot {
+				if strings.Contains(yaml, s) {
+					t.Errorf("config.yaml unexpectedly contains %q\n---\n%s", s, yaml)
+				}
+			}
+		})
 	}
 }
 
 func TestRender_SubstitutesModuleAndName(t *testing.T) {
 	t.Parallel()
-	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo"}
+	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}}
 	plan, err := scaffold.Render(req)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
@@ -67,6 +157,10 @@ func TestRender_SubstitutesModuleAndName(t *testing.T) {
 		case "cmd/api/main.go":
 			if !strings.Contains(string(f.Content), `"example.com/demo/internal/api"`) {
 				t.Errorf("main.go missing module import; got %q", f.Content)
+			}
+		case "cmd/api/memory.go":
+			if !strings.Contains(string(f.Content), `"example.com/demo/internal/resource/database/memory"`) {
+				t.Errorf("memory.go missing module import; got %q", f.Content)
 			}
 		}
 	}
