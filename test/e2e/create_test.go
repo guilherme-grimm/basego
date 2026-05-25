@@ -76,7 +76,7 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 				"cmd/api/deps.go",
 				"cmd/api/services.go",
 				"internal/api/router.go",
-				"internal/domain/entity/error.go",
+				"internal/domain/entity/problem.go",
 				"internal/domain/entity/example/example.go",
 				"internal/domain/gateway/example/gateway.go",
 				"internal/service/example/service.go",

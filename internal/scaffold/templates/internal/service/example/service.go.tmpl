@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"{{.Module}}/internal/domain/entity"
@@ -34,7 +35,7 @@ func New(repo Repo) *Service { return &Service{repo: repo} }
 // Create validates name, generates an ID, and persists.
 func (s *Service) Create(ctx context.Context, name string) (*exampleentity.Example, error) {
 	if strings.TrimSpace(name) == "" {
-		return nil, entity.New("name is required", "example_validation_failed", entity.CodeValidationFailed)
+		return nil, entity.NewProblem("name is required", "example_validation_failed", http.StatusUnprocessableEntity)
 	}
 	id, err := newID()
 	if err != nil {
