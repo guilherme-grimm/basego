@@ -1,0 +1,14 @@
+package example
+
+import (
+	"net/http"
+
+	"{{.Module}}/internal/domain/entity"
+)
+
+// Per-slice sentinels. Translated from driver errors at the resource layer
+// (DESIGN §7). Handlers and services compare with errors.Is.
+var (
+	ErrNotFound = entity.NewProblem("example not found", "example_not_found", http.StatusNotFound)
+	ErrConflict = entity.NewProblem("example already exists", "example_conflict", http.StatusConflict)
+)

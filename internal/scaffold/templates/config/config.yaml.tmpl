@@ -5,6 +5,11 @@ server:
 log:
   level: info
   json: true
+
+service:
+  example:
+    enabled: true
+    driver: memory
 {{if or (.HasDriver "mongo") (.HasDriver "postgres")}}
 resources:
 {{- if .HasDriver "mongo"}}

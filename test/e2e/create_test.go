@@ -73,8 +73,16 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 				"go.mod",
 				"cmd/api/main.go",
 				"cmd/api/memory.go",
+				"cmd/api/deps.go",
+				"cmd/api/services.go",
 				"internal/api/router.go",
+				"internal/domain/entity/problem.go",
+				"internal/domain/entity/example/example.go",
+				"internal/domain/gateway/example/gateway.go",
+				"internal/service/example/service.go",
+				"internal/service/example/service_test.go",
 				"internal/resource/database/memory/store.go",
+				"internal/resource/database/memory/example.go",
 			} {
 				if _, err := os.Stat(filepath.Join(target, rel)); err != nil {
 					t.Errorf("missing required file %s: %v", rel, err)

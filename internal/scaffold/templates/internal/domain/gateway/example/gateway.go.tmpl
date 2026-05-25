@@ -1,0 +1,16 @@
+// Package example is the API-facing port for the example slice. Handlers
+// depend on Gateway; the service layer implements it.
+package example
+
+import (
+	"context"
+
+	exampleentity "{{.Module}}/internal/domain/entity/example"
+)
+
+// Gateway is the contract HTTP handlers call. Implemented by the service
+// layer (internal/service/example.Service).
+type Gateway interface {
+	Create(ctx context.Context, name string) (*exampleentity.Example, error)
+	Get(ctx context.Context, id string) (*exampleentity.Example, error)
+}

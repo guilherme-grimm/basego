@@ -1,0 +1,69 @@
+package example_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	exampleentity "{{.Module}}/internal/domain/entity/example"
+	memresource "{{.Module}}/internal/resource/database/memory"
+	exampleservice "{{.Module}}/internal/service/example"
+)
+
+func newService(t *testing.T) *exampleservice.Service {
+	t.Helper()
+	store := memresource.NewStore()
+	return exampleservice.New(memresource.NewExampleRepo(store))
+}
+
+func TestService_CreateThenGet(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"basic", "alpha"},
+		{"with spaces", "  beta  "},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s := newService(t)
+			created, err := s.Create(context.Background(), tc.input)
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if created.ID == "" {
+				t.Errorf("Create: empty ID")
+			}
+			if created.Name != tc.input {
+				t.Errorf("Name = %q, want %q", created.Name, tc.input)
+			}
+			fetched, err := s.Get(context.Background(), created.ID)
+			if err != nil {
+				t.Fatalf("Get: %v", err)
+			}
+			if fetched.ID != created.ID || fetched.Name != created.Name {
+				t.Errorf("Get round-trip mismatch: got %+v, want %+v", fetched, created)
+			}
+		})
+	}
+}
+
+func TestService_CreateRejectsEmptyName(t *testing.T) {
+	t.Parallel()
+	s := newService(t)
+	_, err := s.Create(context.Background(), "   ")
+	if err == nil {
+		t.Fatal("Create: expected error, got nil")
+	}
+}
+
+func TestService_GetUnknownReturnsNotFound(t *testing.T) {
+	t.Parallel()
+	s := newService(t)
+	_, err := s.Get(context.Background(), "nope")
+	if !errors.Is(err, exampleentity.ErrNotFound) {
+		t.Fatalf("Get: err = %v, want ErrNotFound", err)
+	}
+}

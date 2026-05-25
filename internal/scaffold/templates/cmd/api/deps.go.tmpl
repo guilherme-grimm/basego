@@ -1,0 +1,32 @@
+package main
+
+import (
+	memresource "{{.Module}}/internal/resource/database/memory"
+{{- if .HasDriver "mongo" }}
+	mongoresource "{{.Module}}/internal/resource/database/mongo"
+{{- end }}
+{{- if .HasDriver "postgres" }}
+	pgresource "{{.Module}}/internal/resource/database/postgres"
+{{- end }}
+)
+
+// Deps groups runtime infra handles passed to buildServices. Each field
+// is populated by a SetupX function in cmd/api/<driver>.go.
+type Deps struct {
+	Memory *memresource.Store
+{{- if .HasDriver "mongo" }}
+	Mongo *mongoresource.Client
+{{- end }}
+{{- if .HasDriver "postgres" }}
+	Postgres *pgresource.Pool
+{{- end }}
+}
+
+// buildDeps wires the in-process resources. Real mongo/postgres dials are
+// deferred until scaffold-time `go mod tidy` lands (Del 8); their fields
+// stay nil for now and only the memory driver is reachable at runtime.
+func buildDeps() Deps {
+	return Deps{
+		Memory: SetupMemory(),
+	}
+}
