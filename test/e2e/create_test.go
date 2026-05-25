@@ -156,6 +156,17 @@ paths:
 			t.Errorf("missing %s: %v", rel, err)
 		}
 	}
+	// doc.go must carry the go:generate directive so `make generate`
+	// produces types_gen.go without further wiring.
+	doc, err := os.ReadFile(filepath.Join(target, "internal/api/openapi/pets/doc.go"))
+	if err != nil {
+		t.Fatalf("read pets/doc.go: %v", err)
+	}
+	for _, want := range []string{"//go:generate", "oapi-codegen", "-include-tags=pets", "../spec.yaml"} {
+		if !strings.Contains(string(doc), want) {
+			t.Errorf("pets/doc.go missing %q\n---\n%s", want, doc)
+		}
+	}
 	// Generated project must still build with the new per-tag packages.
 	cmd := exec.Command(goBin, "build", "./...")
 	cmd.Dir = target

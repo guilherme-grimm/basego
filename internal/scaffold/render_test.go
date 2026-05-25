@@ -209,23 +209,25 @@ paths:
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
-	wantPaths := map[string]string{
-		"internal/api/openapi/spec.yaml":      "openapi: 3.0.3\n",
-		"internal/api/openapi/pets/doc.go":    "package pets",
-		"internal/api/openapi/orders/doc.go":  "package orders",
+	wantPaths := map[string][]string{
+		"internal/api/openapi/spec.yaml":     {"openapi: 3.0.3\n"},
+		"internal/api/openapi/pets/doc.go":   {"package pets", "//go:generate", "-include-tags=pets", "-o=types_gen.go ../spec.yaml"},
+		"internal/api/openapi/orders/doc.go": {"package orders", "//go:generate", "-include-tags=orders"},
 	}
 	got := map[string]string{}
 	for _, f := range plan.Files {
 		got[f.Path] = string(f.Content)
 	}
-	for path, mustHave := range wantPaths {
+	for path, mustHaves := range wantPaths {
 		content, ok := got[path]
 		if !ok {
 			t.Errorf("missing file %s", path)
 			continue
 		}
-		if !strings.Contains(content, mustHave) {
-			t.Errorf("file %s content %q missing %q", path, content, mustHave)
+		for _, mustHave := range mustHaves {
+			if !strings.Contains(content, mustHave) {
+				t.Errorf("file %s missing %q\n---\n%s", path, mustHave, content)
+			}
 		}
 	}
 }

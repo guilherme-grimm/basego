@@ -16,6 +16,12 @@ const (
 	templatesRoot = "templates"
 	driversPrefix = "drivers/"
 	tmplSuffix    = ".tmpl"
+
+	// oapiCodegenVersion pins the oapi-codegen module version used in
+	// `//go:generate go run ...@version` directives. Bumping here is the
+	// only point of change when upgrading codegen across all generated
+	// projects.
+	oapiCodegenVersion = "v2.4.1"
 )
 
 // Render expands the embedded skeleton templates against req and returns a
@@ -85,16 +91,29 @@ func specFiles(req *CreateRequest) []File {
 	}}
 	for _, s := range req.Spec.Slices {
 		out = append(out, File{
-			Path: "internal/api/openapi/" + s.Tag + "/doc.go",
-			Content: []byte(
-				"// Package " + s.Tag + " holds the generated OpenAPI server stubs\n" +
-					"// and the hand-written handler for the " + s.Tag + " slice.\n" +
-					"//\n" +
-					"// Generated code lands here in a follow-up deliverable.\n" +
-					"package " + s.Tag + "\n"),
+			Path:    "internal/api/openapi/" + s.Tag + "/doc.go",
+			Content: []byte(renderDocGo(s.Tag)),
 		})
 	}
 	return out
+}
+
+// renderDocGo builds the per-slice doc.go body. It contains the package
+// declaration plus a //go:generate directive that invokes oapi-codegen on
+// demand via `go run pkg@version` — no tool dep is added to the generated
+// project's go.mod, so projects compile offline and only need network when
+// the user runs `make generate`.
+func renderDocGo(tag string) string {
+	return "// Package " + tag + " holds the generated OpenAPI types and (in a\n" +
+		"// follow-up deliverable) server stubs for the " + tag + " slice.\n" +
+		"//\n" +
+		"// Run `make generate` (or `go generate ./...`) to (re-)generate\n" +
+		"// types_gen.go from the spec.\n" +
+		"package " + tag + "\n" +
+		"\n" +
+		"//go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@" + oapiCodegenVersion +
+		" -package=" + tag + " -generate=types -include-tags=" + tag +
+		" -o=types_gen.go ../spec.yaml\n"
 }
 
 type pathAction int
