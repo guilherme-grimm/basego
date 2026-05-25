@@ -55,16 +55,8 @@ func TestRun(t *testing.T) {
 			wantErr:   cli.ErrUsage,
 			stderrHas: "invalid project name",
 		},
-		{
-			name:      "create with valid name accepted",
-			args:      []string{"basego", "create", "my-app"},
-			stdoutHas: `"my-app"`,
-		},
-		{
-			name:      "create with file extension accepted",
-			args:      []string{"basego", "create", "my-app", "file", "spec.yaml"},
-			stdoutHas: "extensions=1",
-		},
+		// Happy-path scaffolding is covered by render and E2E tests; we
+		// keep cli_test focused on the dispatch + error-routing surface.
 	}
 
 	for _, tc := range tests {
