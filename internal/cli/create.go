@@ -193,6 +193,10 @@ func runCreate(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintf(stderr, "basego create: %s\n", err)
 		return err
 	}
+	if err := scaffold.PostWrite(plan.Target, req); err != nil {
+		fmt.Fprintf(stderr, "basego create: %s\n", err)
+		return err
+	}
 	fmt.Fprintf(stdout, "scaffolded %q at ./%s\n", req.Name, plan.Target)
 	return nil
 }
