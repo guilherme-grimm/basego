@@ -1,0 +1,27 @@
+package api_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"{{.Module}}/internal/api"
+)
+
+func TestHealthEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(api.NewRouter())
+	t.Cleanup(srv.Close)
+
+	for _, path := range []string{"/healthz", "/readyz"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %s: status %d, want 200", path, resp.StatusCode)
+		}
+	}
+}

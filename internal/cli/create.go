@@ -154,8 +154,15 @@ func runCreate(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stderr, "usage: basego create [--module=path] [--db=driver,...] <name> [extension ...]")
 		return ErrUsage
 	}
-	fmt.Fprintf(stdout, "basego create: parsed request name=%q module=%q drivers=%v extensions=%d\n",
-		req.Name, req.Module, req.Drivers, len(req.Extensions))
-	fmt.Fprintln(stdout, "(scaffolding lands in Deliverable 3)")
+	plan, err := scaffold.Render(req)
+	if err != nil {
+		fmt.Fprintf(stderr, "basego create: render: %s\n", err)
+		return err
+	}
+	if err := scaffold.Write(plan); err != nil {
+		fmt.Fprintf(stderr, "basego create: %s\n", err)
+		return err
+	}
+	fmt.Fprintf(stdout, "scaffolded %q at ./%s\n", req.Name, plan.Target)
 	return nil
 }
