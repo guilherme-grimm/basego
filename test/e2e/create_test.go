@@ -70,6 +70,7 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 
 			// Always-present files
 			for _, rel := range []string{
+				"Makefile",
 				"go.mod",
 				"cmd/api/main.go",
 				"cmd/api/memory.go",

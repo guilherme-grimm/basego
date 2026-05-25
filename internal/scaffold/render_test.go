@@ -13,6 +13,7 @@ import (
 var baseFiles = []string{
 	".gitattributes",
 	".gitignore",
+	"Makefile",
 	"README.md",
 	"cmd/api/deps.go",
 	"cmd/api/main.go",
