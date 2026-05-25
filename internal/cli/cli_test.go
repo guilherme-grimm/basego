@@ -61,10 +61,9 @@ func TestRun(t *testing.T) {
 			stdoutHas: `"my-app"`,
 		},
 		{
-			name:      "create with extras rejected (deliverable 2)",
+			name:      "create with file extension accepted",
 			args:      []string{"basego", "create", "my-app", "file", "spec.yaml"},
-			wantErr:   cli.ErrUsage,
-			stderrHas: "not yet implemented",
+			stdoutHas: "extensions=1",
 		},
 	}
 
