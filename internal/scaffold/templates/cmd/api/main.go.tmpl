@@ -23,6 +23,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	deps := buildDeps()
+	if _, err := buildServices(deps, defaultServiceConfig(), logger); err != nil {
+		logger.Error("wire services", "err", err)
+		os.Exit(1)
+	}
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           api.NewRouter(),

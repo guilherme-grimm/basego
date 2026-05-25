@@ -13,14 +13,24 @@ var baseFiles = []string{
 	".gitattributes",
 	".gitignore",
 	"README.md",
+	"cmd/api/deps.go",
 	"cmd/api/main.go",
 	"cmd/api/memory.go",
+	"cmd/api/services.go",
 	"config/config.yaml",
 	"go.mod",
 	"internal/api/health.go",
 	"internal/api/health_test.go",
 	"internal/api/router.go",
+	"internal/domain/entity/code.go",
+	"internal/domain/entity/error.go",
+	"internal/domain/entity/example/errors.go",
+	"internal/domain/entity/example/example.go",
+	"internal/domain/gateway/example/gateway.go",
+	"internal/resource/database/memory/example.go",
 	"internal/resource/database/memory/store.go",
+	"internal/service/example/service.go",
+	"internal/service/example/service_test.go",
 }
 
 func TestRender_DriverMatrix(t *testing.T) {
@@ -34,16 +44,20 @@ func TestRender_DriverMatrix(t *testing.T) {
 		{"with mongo", []string{"memory", "mongo"}, []string{
 			"cmd/api/mongo.go",
 			"internal/resource/database/mongo/client.go",
+			"internal/resource/database/mongo/example.go",
 		}},
 		{"with postgres", []string{"memory", "postgres"}, []string{
 			"cmd/api/postgres.go",
 			"internal/resource/database/postgres/client.go",
+			"internal/resource/database/postgres/example.go",
 		}},
 		{"with both", []string{"memory", "mongo", "postgres"}, []string{
 			"cmd/api/mongo.go",
 			"cmd/api/postgres.go",
 			"internal/resource/database/mongo/client.go",
+			"internal/resource/database/mongo/example.go",
 			"internal/resource/database/postgres/client.go",
+			"internal/resource/database/postgres/example.go",
 		}},
 	}
 

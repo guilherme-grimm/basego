@@ -1,0 +1,24 @@
+package postgres
+
+import (
+	"context"
+
+	exampleentity "{{.Module}}/internal/domain/entity/example"
+)
+
+// ExampleRepo is the postgres impl placeholder. Real wiring (sqlx + sqlc)
+// lands when scaffold-time `go mod tidy` is in place; methods panic until
+// then so a runtime route to postgres surfaces loudly.
+type ExampleRepo struct {
+	pool *Pool
+}
+
+func NewExampleRepo(pool *Pool) *ExampleRepo { return &ExampleRepo{pool: pool} }
+
+func (r *ExampleRepo) Save(context.Context, *exampleentity.Example) error {
+	panic("postgres.ExampleRepo.Save: not implemented")
+}
+
+func (r *ExampleRepo) FindByID(context.Context, string) (*exampleentity.Example, error) {
+	panic("postgres.ExampleRepo.FindByID: not implemented")
+}

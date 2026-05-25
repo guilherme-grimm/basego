@@ -1,0 +1,61 @@
+// Package example implements the example slice's business behavior.
+// Service satisfies internal/domain/gateway/example.Gateway and uses a
+// Repo port for persistence — resource drivers implement Repo implicitly
+// (Go duck typing keeps resource → service import-free).
+package example
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"strings"
+
+	"{{.Module}}/internal/domain/entity"
+	exampleentity "{{.Module}}/internal/domain/entity/example"
+)
+
+// Repo is the data-facing port. Resource drivers (memory, mongo, postgres)
+// satisfy it. Defined here so the consumer (service) owns the shape; Go's
+// structural typing means no resource package needs to import this file.
+type Repo interface {
+	Save(ctx context.Context, e *exampleentity.Example) error
+	FindByID(ctx context.Context, id string) (*exampleentity.Example, error)
+}
+
+// Service is the only impl of gateway.Gateway. Holds a Repo for storage.
+type Service struct {
+	repo Repo
+}
+
+// New constructs a Service bound to repo. Constructor injection — no init.
+func New(repo Repo) *Service { return &Service{repo: repo} }
+
+// Create validates name, generates an ID, and persists.
+func (s *Service) Create(ctx context.Context, name string) (*exampleentity.Example, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, entity.New("name is required", "example_validation_failed", entity.CodeValidationFailed)
+	}
+	id, err := newID()
+	if err != nil {
+		return nil, fmt.Errorf("generate id: %w", err)
+	}
+	e := &exampleentity.Example{ID: id, Name: name}
+	if err := s.repo.Save(ctx, e); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// Get returns the example with the given id or ErrNotFound.
+func (s *Service) Get(ctx context.Context, id string) (*exampleentity.Example, error) {
+	return s.repo.FindByID(ctx, id)
+}
+
+func newID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
+}

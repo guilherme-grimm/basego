@@ -1,0 +1,67 @@
+package main
+
+import (
+	"fmt"
+	"log/slog"
+
+	exampleservice "{{.Module}}/internal/service/example"
+	memresource "{{.Module}}/internal/resource/database/memory"
+{{- if .HasDriver "mongo" }}
+	mongoresource "{{.Module}}/internal/resource/database/mongo"
+{{- end }}
+{{- if .HasDriver "postgres" }}
+	pgresource "{{.Module}}/internal/resource/database/postgres"
+{{- end }}
+)
+
+// Services is the bag of wired service gateways. main holds it to register
+// routes once the OAPI handler layer lands.
+type Services struct {
+	Example *exampleservice.Service
+}
+
+// ServiceConfig is the minimal stand-in for the viper-backed config until
+// Del 8 wires real config loading. Defaults match config/config.yaml.
+type ServiceConfig struct {
+	Example struct {
+		Enabled bool
+		Driver  string
+	}
+}
+
+func defaultServiceConfig() ServiceConfig {
+	var c ServiceConfig
+	c.Example.Enabled = true
+	c.Example.Driver = "memory"
+	return c
+}
+
+// buildServices is the one place that knows the wiring graph
+// (service ↔ port ↔ resource). Per-service switch routes by config-selected
+// driver; default branch fails loudly so a typo in config can't silently
+// disable a service.
+func buildServices(deps Deps, cfg ServiceConfig, logger *slog.Logger) (*Services, error) {
+	s := &Services{}
+
+	if cfg.Example.Enabled {
+		var repo exampleservice.Repo
+		switch cfg.Example.Driver {
+		case "memory":
+			repo = memresource.NewExampleRepo(deps.Memory)
+{{- if .HasDriver "mongo" }}
+		case "mongo":
+			repo = mongoresource.NewExampleRepo(deps.Mongo)
+{{- end }}
+{{- if .HasDriver "postgres" }}
+		case "postgres":
+			repo = pgresource.NewExampleRepo(deps.Postgres)
+{{- end }}
+		default:
+			return nil, fmt.Errorf("unknown driver %q for service example", cfg.Example.Driver)
+		}
+		s.Example = exampleservice.New(repo)
+		logger.Info("wired service", "service", "example", "driver", cfg.Example.Driver)
+	}
+
+	return s, nil
+}

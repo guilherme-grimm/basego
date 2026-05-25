@@ -1,0 +1,24 @@
+package mongo
+
+import (
+	"context"
+
+	exampleentity "{{.Module}}/internal/domain/entity/example"
+)
+
+// ExampleRepo is the mongo impl placeholder. Real wiring (mongo-go-driver)
+// lands in a follow-up — methods panic to make it obvious if the wiring
+// graph routes here before the impl is finished.
+type ExampleRepo struct {
+	client *Client
+}
+
+func NewExampleRepo(client *Client) *ExampleRepo { return &ExampleRepo{client: client} }
+
+func (r *ExampleRepo) Save(context.Context, *exampleentity.Example) error {
+	panic("mongo.ExampleRepo.Save: not implemented")
+}
+
+func (r *ExampleRepo) FindByID(context.Context, string) (*exampleentity.Example, error) {
+	panic("mongo.ExampleRepo.FindByID: not implemented")
+}

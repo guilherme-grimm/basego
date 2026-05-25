@@ -1,0 +1,39 @@
+package memory
+
+import (
+	"context"
+
+	exampleentity "{{.Module}}/internal/domain/entity/example"
+)
+
+// ExampleRepo is the in-memory implementation of the example slice's Repo
+// port (defined in internal/service/example). Satisfied structurally — no
+// import of the service package needed.
+type ExampleRepo struct {
+	store *Store
+	data  map[string]*exampleentity.Example
+}
+
+// NewExampleRepo returns a Repo bound to store. Wired in cmd/api/services.go.
+func NewExampleRepo(store *Store) *ExampleRepo {
+	return &ExampleRepo{store: store, data: make(map[string]*exampleentity.Example)}
+}
+
+// Save upserts e by ID under the store's mutex.
+func (r *ExampleRepo) Save(_ context.Context, e *exampleentity.Example) error {
+	r.store.Mu.Lock()
+	defer r.store.Mu.Unlock()
+	r.data[e.ID] = e
+	return nil
+}
+
+// FindByID returns the example or exampleentity.ErrNotFound.
+func (r *ExampleRepo) FindByID(_ context.Context, id string) (*exampleentity.Example, error) {
+	r.store.Mu.Lock()
+	defer r.store.Mu.Unlock()
+	e, ok := r.data[id]
+	if !ok {
+		return nil, exampleentity.ErrNotFound
+	}
+	return e, nil
+}
