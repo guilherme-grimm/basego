@@ -1,0 +1,22 @@
+package main
+
+import (
+	"context"
+	"errors"
+
+	"{{.Module}}/internal/resource/database/postgres"
+)
+
+// SetupPostgres dials Postgres using the configured DSN. The real driver
+// dependency (pgxpool) lands in a follow-up; the signature is fixed now so
+// services.go can be generated against it.
+func SetupPostgres(_ context.Context, _ PostgresConfig) (*postgres.Pool, error) {
+	return nil, errors.New("postgres setup not implemented yet")
+}
+
+// PostgresConfig mirrors the resources.postgres block in config.yaml.
+// Resolved from Viper in a later deliverable; declared here so the setup
+// signature is stable across PRs.
+type PostgresConfig struct {
+	DSN string
+}

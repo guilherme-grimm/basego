@@ -1,0 +1,19 @@
+server:
+  port: 8080
+  shutdown_timeout: 30s
+
+log:
+  level: info
+  json: true
+{{if or (.HasDriver "mongo") (.HasDriver "postgres")}}
+resources:
+{{- if .HasDriver "mongo"}}
+  mongo:
+    uri: mongodb://localhost:27017
+    database: {{.Name}}
+{{- end}}
+{{- if .HasDriver "postgres"}}
+  postgres:
+    dsn: postgres://user:pass@localhost:5432/{{.Name}}
+{{- end}}
+{{- end}}

@@ -31,3 +31,15 @@ func (r *CreateRequest) HasExtension(name string) bool {
 	}
 	return false
 }
+
+// HasDriver reports whether the request selected the named DB driver. Used
+// to gate driver-specific template overlays and config sections. Callable
+// from text/template via {{.HasDriver "mongo"}}.
+func (r *CreateRequest) HasDriver(name string) bool {
+	for _, d := range r.Drivers {
+		if d == name {
+			return true
+		}
+	}
+	return false
+}
