@@ -4,10 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/guilherme-grimm/basego/internal/oapi"
 	"github.com/guilherme-grimm/basego/internal/scaffold"
 )
 
@@ -70,6 +72,30 @@ func ParseCreate(args []string) (*scaffold.CreateRequest, error) {
 		Drivers:    drivers,
 		Extensions: exts,
 	}, nil
+}
+
+// LoadSpec resolves the `file <spec.yaml>` extension by reading the file
+// and parsing it. It mutates req in place. Returns nil if no file
+// extension is present.
+func LoadSpec(req *scaffold.CreateRequest) error {
+	for _, e := range req.Extensions {
+		if e.Name != "file" {
+			continue
+		}
+		path := e.Args[0]
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read spec %s: %w", path, err)
+		}
+		spec, err := oapi.Parse(data)
+		if err != nil {
+			return err
+		}
+		req.Spec = spec
+		req.SpecBytes = data
+		return nil
+	}
+	return nil
 }
 
 func validateModule(m string) error {
@@ -153,6 +179,10 @@ func runCreate(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintf(stderr, "basego create: %s\n", err)
 		fmt.Fprintln(stderr, "usage: basego create [--module=path] [--db=driver,...] <name> [extension ...]")
 		return ErrUsage
+	}
+	if err := LoadSpec(req); err != nil {
+		fmt.Fprintf(stderr, "basego create: %s\n", err)
+		return err
 	}
 	plan, err := scaffold.Render(req)
 	if err != nil {

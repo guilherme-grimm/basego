@@ -68,7 +68,33 @@ func Render(req *CreateRequest) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
+	files = append(files, specFiles(req)...)
 	return Plan{Target: req.Name, Files: files}, nil
+}
+
+// specFiles emits the OAPI-derived files when the request carries a spec:
+// the spec itself (verbatim copy) and one placeholder doc.go per tag. Real
+// codegen wiring lands in a follow-up deliverable.
+func specFiles(req *CreateRequest) []File {
+	if req.Spec == nil {
+		return nil
+	}
+	out := []File{{
+		Path:    "internal/api/openapi/spec.yaml",
+		Content: req.SpecBytes,
+	}}
+	for _, s := range req.Spec.Slices {
+		out = append(out, File{
+			Path: "internal/api/openapi/" + s.Tag + "/doc.go",
+			Content: []byte(
+				"// Package " + s.Tag + " holds the generated OpenAPI server stubs\n" +
+					"// and the hand-written handler for the " + s.Tag + " slice.\n" +
+					"//\n" +
+					"// Generated code lands here in a follow-up deliverable.\n" +
+					"package " + s.Tag + "\n"),
+		})
+	}
+	return out
 }
 
 type pathAction int

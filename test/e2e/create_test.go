@@ -107,6 +107,96 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 	}
 }
 
+func TestCreate_WithOpenAPISpec(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go binary not in PATH; skipping e2e spec test")
+	}
+	basego := buildBasego(t, goBin)
+
+	root := t.TempDir()
+	specPath := filepath.Join(root, "spec.yaml")
+	const spec = `openapi: 3.0.3
+info:
+  title: demo
+  version: 0.1.0
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      operationId: listPets
+      responses:
+        "200":
+          description: ok
+  /orders:
+    get:
+      tags: [orders]
+      operationId: listOrders
+      responses:
+        "200":
+          description: ok
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	create := exec.Command(basego, "create", "--module=example.com/demo", "demo", "file", "spec.yaml")
+	create.Dir = root
+	if out, err := create.CombinedOutput(); err != nil {
+		t.Fatalf("basego create with spec: %v\n%s", err, out)
+	}
+	target := filepath.Join(root, "demo")
+	for _, rel := range []string{
+		"internal/api/openapi/spec.yaml",
+		"internal/api/openapi/pets/doc.go",
+		"internal/api/openapi/orders/doc.go",
+	} {
+		if _, err := os.Stat(filepath.Join(target, rel)); err != nil {
+			t.Errorf("missing %s: %v", rel, err)
+		}
+	}
+	// Generated project must still build with the new per-tag packages.
+	cmd := exec.Command(goBin, "build", "./...")
+	cmd.Dir = target
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build with spec: %v\n%s", err, out)
+	}
+}
+
+func TestCreate_RejectsUntaggedSpec(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go binary not in PATH")
+	}
+	basego := buildBasego(t, goBin)
+
+	root := t.TempDir()
+	specPath := filepath.Join(root, "spec.yaml")
+	const spec = `openapi: 3.0.3
+paths:
+  /naked:
+    get:
+      operationId: getNaked
+      responses: {"200": {description: ok}}
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+	create := exec.Command(basego, "create", "--module=example.com/demo", "demo", "file", "spec.yaml")
+	create.Dir = root
+	out, err := create.CombinedOutput()
+	if err == nil {
+		t.Fatalf("basego create with untagged op: expected error, got success\n%s", out)
+	}
+	if !strings.Contains(string(out), "no tag") {
+		t.Errorf("stderr missing 'no tag' diagnostic; got %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "demo")); !os.IsNotExist(err) {
+		t.Errorf("project dir was created despite spec failure: stat err = %v", err)
+	}
+}
+
 // buildBasego compiles the basego binary once and returns the path to the
 // resulting executable. Shared across all subtests in the process.
 func buildBasego(t *testing.T, goBin string) string {
