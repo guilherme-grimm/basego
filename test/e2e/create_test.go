@@ -70,6 +70,7 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 
 			// Always-present files
 			for _, rel := range []string{
+				"Makefile",
 				"go.mod",
 				"cmd/api/main.go",
 				"cmd/api/memory.go",
@@ -103,7 +104,184 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 					t.Fatalf("go %v in generated project failed: %v\n%s", gargs, err, out)
 				}
 			}
+
+			// Side effects: git repo with one commit on main.
+			assertGitRepo(t, target)
 		})
+	}
+}
+
+// assertGitRepo verifies the scaffolded project has a fresh git repo with
+// exactly one commit on the main branch — DESIGN §15's "initial scaffold
+// from basego" commit. Run after each scaffolding subtest to confirm
+// PostWrite actually fired.
+func assertGitRepo(t *testing.T, target string) {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(target, ".git")); err != nil {
+		t.Errorf(".git dir missing: %v", err)
+		return
+	}
+	cmd := exec.Command("git", "-C", target, "log", "--oneline")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("git log failed: %v\n%s", err, out)
+		return
+	}
+	if !strings.Contains(string(out), "initial scaffold from basego") {
+		t.Errorf("initial commit missing; git log:\n%s", out)
+	}
+}
+
+func TestCreate_WithOpenAPISpec(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go binary not in PATH; skipping e2e spec test")
+	}
+	basego := buildBasego(t, goBin)
+
+	root := t.TempDir()
+	specPath := filepath.Join(root, "spec.yaml")
+	const spec = `openapi: 3.0.3
+info:
+  title: demo
+  version: 0.1.0
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      operationId: listPets
+      responses:
+        "200":
+          description: ok
+  /orders:
+    get:
+      tags: [orders]
+      operationId: listOrders
+      responses:
+        "200":
+          description: ok
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	create := exec.Command(basego, "create", "--module=example.com/demo", "demo", "file", "spec.yaml")
+	create.Dir = root
+	// Skip the codegen step: it shells out to `go run pkg@v...` which
+	// needs network. Tidy + git init still run.
+	create.Env = append(os.Environ(), "BASEGO_NO_GENERATE=1")
+	if out, err := create.CombinedOutput(); err != nil {
+		t.Fatalf("basego create with spec: %v\n%s", err, out)
+	}
+	target := filepath.Join(root, "demo")
+	assertGitRepo(t, target)
+	for _, rel := range []string{
+		"internal/api/openapi/spec.yaml",
+		"internal/api/openapi/pets/doc.go",
+		"internal/api/openapi/pets/handler.go",
+		"internal/api/openapi/orders/doc.go",
+		"internal/api/openapi/orders/handler.go",
+	} {
+		if _, err := os.Stat(filepath.Join(target, rel)); err != nil {
+			t.Errorf("missing %s: %v", rel, err)
+		}
+	}
+	// handler.go must contain a method matching the spec's operationId.
+	h, err := os.ReadFile(filepath.Join(target, "internal/api/openapi/pets/handler.go"))
+	if err != nil {
+		t.Fatalf("read pets/handler.go: %v", err)
+	}
+	if !strings.Contains(string(h), "func (h *Handler) ListPets(") {
+		t.Errorf("pets/handler.go missing ListPets method\n---\n%s", h)
+	}
+	// doc.go must carry the go:generate directive so `make generate`
+	// produces types_gen.go without further wiring.
+	doc, err := os.ReadFile(filepath.Join(target, "internal/api/openapi/pets/doc.go"))
+	if err != nil {
+		t.Fatalf("read pets/doc.go: %v", err)
+	}
+	for _, want := range []string{"//go:generate", "oapi-codegen", "-include-tags=pets", "../spec.yaml"} {
+		if !strings.Contains(string(doc), want) {
+			t.Errorf("pets/doc.go missing %q\n---\n%s", want, doc)
+		}
+	}
+	// Generated project must still build with the new per-tag packages.
+	cmd := exec.Command(goBin, "build", "./...")
+	cmd.Dir = target
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build with spec: %v\n%s", err, out)
+	}
+}
+
+func TestCreate_RejectsUntaggedSpec(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go binary not in PATH")
+	}
+	basego := buildBasego(t, goBin)
+
+	root := t.TempDir()
+	specPath := filepath.Join(root, "spec.yaml")
+	const spec = `openapi: 3.0.3
+paths:
+  /naked:
+    get:
+      operationId: getNaked
+      responses: {"200": {description: ok}}
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+	create := exec.Command(basego, "create", "--module=example.com/demo", "demo", "file", "spec.yaml")
+	create.Dir = root
+	out, err := create.CombinedOutput()
+	if err == nil {
+		t.Fatalf("basego create with untagged op: expected error, got success\n%s", out)
+	}
+	if !strings.Contains(string(out), "no tag") {
+		t.Errorf("stderr missing 'no tag' diagnostic; got %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "demo")); !os.IsNotExist(err) {
+		t.Errorf("project dir was created despite spec failure: stat err = %v", err)
+	}
+}
+
+// TestCreate_RejectsExistingTarget asserts DESIGN §16: basego refuses to
+// scaffold into a directory that already exists, and crucially does not
+// mutate it. Pre-seeded sentinel content must survive.
+func TestCreate_RejectsExistingTarget(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go binary not in PATH")
+	}
+	basego := buildBasego(t, goBin)
+
+	root := t.TempDir()
+	target := filepath.Join(root, "demo")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatalf("seed target: %v", err)
+	}
+	sentinel := filepath.Join(target, "important.txt")
+	if err := os.WriteFile(sentinel, []byte("do not delete"), 0o644); err != nil {
+		t.Fatalf("seed sentinel: %v", err)
+	}
+
+	create := exec.Command(basego, "create", "--module=example.com/demo", "demo")
+	create.Dir = root
+	out, err := create.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected failure on existing target, got success\n%s", out)
+	}
+	if !strings.Contains(string(out), "already exists") {
+		t.Errorf("stderr missing 'already exists'; got %q", out)
+	}
+	got, err := os.ReadFile(sentinel)
+	if err != nil {
+		t.Fatalf("sentinel disappeared: %v", err)
+	}
+	if string(got) != "do not delete" {
+		t.Errorf("sentinel mutated: %q", got)
 	}
 }
 

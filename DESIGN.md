@@ -400,9 +400,11 @@ log:
   level: info
   json: true
 
-otel:
-  endpoint: localhost:4317
+observability:
   service_name: my-app
+  otlp_endpoint: localhost:4317   # otel-collector; swap for a real backend
+  metrics_path: /metrics          # promhttp exposition scraped by Prometheus
+  trace_sample_ratio: 1.0         # consumed once otel deep-wire lands (post-v1)
 
 resources:
   mongo:
@@ -431,7 +433,7 @@ Default-on, no flags in v1:
 
 - `Makefile` (`build`, `test`, `run`, `lint`, `generate`, `verify-generated`)
 - `Dockerfile` (multi-stage → distroless)
-- `docker-compose.yml` — app + chosen resources + **full obs stack** (VictoriaMetrics + Prometheus + otel-collector + Jaeger or Tempo)
+- `docker-compose.yml` — app + chosen resources + **full LGTM obs stack** (Grafana + Loki + Tempo + Prometheus + otel-collector). Endpoints default to compose service names and are overridable via the `observability:` block in `config/config.yaml`, so pointing at a real backend is a config edit, not a compose rewrite. v1 app-side instrumentation is a single Prometheus `/metrics` endpoint; full otel deep-wire (logger/tracer/metrics middleware) is staged after. See PLAN Deliverables 9–10.
 - `.golangci.yml` (`errorlint`, `testpackage`, `exhaustive`, others)
 - `.gitignore`
 - `.gitattributes` (linguist-generated for `*_gen.go`)

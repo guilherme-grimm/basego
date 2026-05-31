@@ -4,10 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/guilherme-grimm/basego/internal/oapi"
 	"github.com/guilherme-grimm/basego/internal/scaffold"
 )
 
@@ -32,7 +34,9 @@ var supportedExtensions = map[string]int{
 }
 
 // ParseCreate turns the argv slice that follows `basego create` into a
-// validated CreateRequest. It does not touch the filesystem.
+// ParseCreate parses command-line arguments for the "create" command into a validated scaffold.CreateRequest.
+// It recognizes the flags --module (Go module path) and --db (comma-separated drivers), requires a project name positional argument, validates the name, module, drivers and extensions, and does not perform any filesystem operations.
+// It returns the populated CreateRequest on success or an error describing why parsing or validation failed.
 func ParseCreate(args []string) (*scaffold.CreateRequest, error) {
 	fs := flag.NewFlagSet("create", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -72,6 +76,36 @@ func ParseCreate(args []string) (*scaffold.CreateRequest, error) {
 	}, nil
 }
 
+// LoadSpec resolves the `file <spec.yaml>` extension by reading the file
+// and parsing it. It mutates req in place. Returns nil if no file
+// LoadSpec resolves a "file" extension by reading and parsing the referenced OpenAPI spec and storing it on the request.
+// If a "file" extension is present, it reads the file at the extension's first argument, parses it with oapi.Parse,
+// and sets req.Spec and req.SpecBytes. It returns an error if reading or parsing the spec fails. If no "file" extension
+// is present the function is a no-op.
+func LoadSpec(req *scaffold.CreateRequest) error {
+	for _, e := range req.Extensions {
+		if e.Name != "file" {
+			continue
+		}
+		path := e.Args[0]
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read spec %s: %w", path, err)
+		}
+		spec, err := oapi.Parse(data)
+		if err != nil {
+			return err
+		}
+		req.Spec = spec
+		req.SpecBytes = data
+		return nil
+	}
+	return nil
+}
+
+// validateModule checks that the module path is not empty and contains no whitespace.
+// It returns the error "module path is empty" when the trimmed path is empty, or
+// "invalid module path %q: contains whitespace" when the path contains space, tab, or newline.
 func validateModule(m string) error {
 	if strings.TrimSpace(m) == "" {
 		return fmt.Errorf("module path is empty")
@@ -147,6 +181,9 @@ func validateExtensionArgs(e scaffold.Extension) error {
 	return nil
 }
 
+// runCreate parses create subcommand arguments, loads an optional spec file, renders and writes scaffold files, runs post-write hooks, and reports progress and result to the provided stdout/stderr.
+//
+// If flag parsing fails it writes an error and a usage line to stderr and returns ErrUsage. For other failures it writes an error to stderr and returns the underlying error. On success it writes a success message to stdout and returns nil.
 func runCreate(args []string, stdout, stderr io.Writer) error {
 	req, err := ParseCreate(args)
 	if err != nil {
@@ -154,12 +191,20 @@ func runCreate(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stderr, "usage: basego create [--module=path] [--db=driver,...] <name> [extension ...]")
 		return ErrUsage
 	}
+	if err := LoadSpec(req); err != nil {
+		fmt.Fprintf(stderr, "basego create: %s\n", err)
+		return err
+	}
 	plan, err := scaffold.Render(req)
 	if err != nil {
 		fmt.Fprintf(stderr, "basego create: render: %s\n", err)
 		return err
 	}
 	if err := scaffold.Write(plan); err != nil {
+		fmt.Fprintf(stderr, "basego create: %s\n", err)
+		return err
+	}
+	if err := scaffold.PostWrite(plan.Target, req); err != nil {
 		fmt.Fprintf(stderr, "basego create: %s\n", err)
 		return err
 	}
