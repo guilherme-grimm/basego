@@ -16,7 +16,11 @@ import (
 //
 // Each network-touching step honors a BASEGO_NO_* env-var escape hatch so
 // tests can run hermetically. Production users leave them unset and get
-// the full sequence.
+// PostWrite runs deterministic post-scaffolding commands inside the given target directory.
+// It formats Go files, optionally runs `go generate` when the request has a Spec and
+// BASEGO_NO_GENERATE is unset, optionally runs `go mod tidy` when BASEGO_NO_TIDY is unset,
+// and optionally initializes a git repository with an initial commit when BASEGO_NO_GIT is unset.
+// Errors from each step are returned wrapped with a short prefix identifying the failing step.
 func PostWrite(target string, req *CreateRequest) error {
 	if err := runIn(target, "gofmt", "-w", "."); err != nil {
 		return fmt.Errorf("scaffold: gofmt: %w", err)
@@ -41,7 +45,11 @@ func PostWrite(target string, req *CreateRequest) error {
 
 // initGitRepo creates a fresh repo on `main` and stages the initial
 // commit. user.name/user.email are injected per-invocation so the user's
-// global git identity is not required (matters in CI containers).
+// initGitRepo initializes a new Git repository in target on branch main, stages all files,
+// and creates an initial commit with a fixed author identity.
+ // It runs `git init --initial-branch=main -q`, `git add .`, and
+// `git -c user.name=basego -c user.email=basego@localhost commit -q -m "initial scaffold from basego"`.
+// Returns any error produced while running these commands.
 func initGitRepo(target string) error {
 	for _, args := range [][]string{
 		{"init", "--initial-branch=main", "-q"},
@@ -59,6 +67,9 @@ func initGitRepo(target string) error {
 	return nil
 }
 
+// runIn runs the named binary with the provided arguments in dir and returns any execution error.
+// It sets the process working directory to dir and captures combined stdout and stderr; on failure
+// it returns an error that includes the binary, arguments, the underlying error, and the captured output.
 func runIn(dir, bin string, args ...string) error {
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
