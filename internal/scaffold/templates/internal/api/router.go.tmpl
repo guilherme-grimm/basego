@@ -1,0 +1,21 @@
+package api
+
+import (
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+// NewRouter returns the HTTP handler for the API. Routes for service slices
+// are registered here in later deliverables; for now health and metrics
+// endpoints are exposed.
+func NewRouter() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", Healthz)
+	mux.HandleFunc("GET /readyz", Readyz)
+	// /metrics serves Go runtime + process collectors with zero
+	// instrumentation; Prometheus scrapes it. Per-route request histograms
+	// arrive with the otel middleware in a later deliverable.
+	mux.Handle("GET /metrics", promhttp.Handler())
+	return mux
+}
