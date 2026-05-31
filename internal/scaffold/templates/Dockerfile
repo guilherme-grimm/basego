@@ -4,10 +4,10 @@
 FROM golang:1.25 AS build
 WORKDIR /src
 # Copy module files first so dependency download is cached independently of
-# source churn. go.sum may be absent for stdlib-only projects; the glob keeps
-# COPY from failing in that case.
-COPY go.mod ./
-COPY go.sum* ./
+# source churn. go.sum may be absent for stdlib-only projects, so both sources
+# share one COPY: go.mod always matches, keeping the instruction non-empty
+# (a standalone glob matching zero files fails under BuildKit).
+COPY go.mod go.sum* ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /app ./cmd/api
