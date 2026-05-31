@@ -71,7 +71,9 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 
 			// Always-present files
 			for _, rel := range []string{
+				"Dockerfile",
 				"Makefile",
+				"docker-compose.yml",
 				"go.mod",
 				"cmd/api/main.go",
 				"cmd/api/memory.go",
@@ -108,7 +110,27 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 
 			// Side effects: git repo with one commit on main.
 			assertGitRepo(t, target)
+
+			// Generated compose must parse (driver-gated services included).
+			assertComposeValid(t, target)
 		})
+	}
+}
+
+// assertComposeValid runs `docker compose config -q` against the generated
+// compose file to confirm it is structurally valid. Skipped when docker is
+// unavailable so the suite stays runnable without a container runtime.
+func assertComposeValid(t *testing.T, target string) {
+	t.Helper()
+	docker, err := exec.LookPath("docker")
+	if err != nil {
+		t.Logf("docker not installed; skipping compose validation")
+		return
+	}
+	cmd := exec.Command(docker, "compose", "config", "-q")
+	cmd.Dir = target
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("docker compose config failed: %v\n%s", err, out)
 	}
 }
 

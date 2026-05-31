@@ -13,8 +13,10 @@ import (
 var baseFiles = []string{
 	".gitattributes",
 	".gitignore",
+	"Dockerfile",
 	"Makefile",
 	"README.md",
+	"docker-compose.yml",
 	"cmd/api/deps.go",
 	"cmd/api/main.go",
 	"cmd/api/memory.go",
@@ -146,6 +148,66 @@ func TestRender_ConfigYAMLContainsSelectedResources(t *testing.T) {
 			for _, s := range tc.mustNot {
 				if strings.Contains(yaml, s) {
 					t.Errorf("config.yaml unexpectedly contains %q\n---\n%s", s, yaml)
+				}
+			}
+		})
+	}
+}
+
+func TestRender_DockerComposeServices(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		drivers     []string
+		mustContain []string
+		mustNot     []string
+	}{
+		{
+			"memory only — app service alone",
+			[]string{"memory"},
+			[]string{"app:", "build: ."},
+			[]string{"mongo:", "postgres:", "depends_on:"},
+		},
+		{
+			"mongo adds its service + dependency",
+			[]string{"memory", "mongo"},
+			[]string{"mongo:", "image: mongo:7", "depends_on:", "RESOURCES_MONGO_URI: mongodb://mongo:27017"},
+			[]string{"postgres:"},
+		},
+		{
+			"both DBs present",
+			[]string{"memory", "mongo", "postgres"},
+			[]string{"mongo:", "postgres:", "image: postgres:16", "RESOURCES_POSTGRES_DSN: postgres://"},
+			nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: tc.drivers}
+			plan, err := scaffold.Render(req)
+			if err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			var compose string
+			for _, f := range plan.Files {
+				if f.Path == "docker-compose.yml" {
+					compose = string(f.Content)
+					break
+				}
+			}
+			if compose == "" {
+				t.Fatal("docker-compose.yml not in plan")
+			}
+			for _, s := range tc.mustContain {
+				if !strings.Contains(compose, s) {
+					t.Errorf("compose missing %q\n---\n%s", s, compose)
+				}
+			}
+			for _, s := range tc.mustNot {
+				if strings.Contains(compose, s) {
+					t.Errorf("compose unexpectedly contains %q\n---\n%s", s, compose)
 				}
 			}
 		})
