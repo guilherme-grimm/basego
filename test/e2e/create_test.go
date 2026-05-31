@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -127,8 +128,9 @@ func assertGitRepo(t *testing.T, target string) {
 		t.Errorf("git log failed: %v\n%s", err, out)
 		return
 	}
-	// DESIGN §15: the commit records the generating basego version.
-	if !strings.Contains(string(out), "initial scaffold from basego v") {
+	// DESIGN §15: the commit records the generating basego version. Require a
+	// non-empty token after the `v` so an empty/unstamped version is caught.
+	if !regexp.MustCompile(`initial scaffold from basego v\S+`).Match(out) {
 		t.Errorf("initial commit missing or lacks version marker; git log:\n%s", out)
 	}
 }
