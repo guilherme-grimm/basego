@@ -12,7 +12,7 @@ import (
 //  1. gofmt -w .                (canonical formatting, helps determinism)
 //  2. go generate ./...         (only when req.Spec is set — file ext used)
 //  3. go mod tidy               (resolve deps; near-no-op on stdlib-only)
-//  4. git init + initial commit ("initial scaffold from basego")
+//  4. git init + initial commit ("initial scaffold from basego v<version>")
 //
 // Each network-touching step honors a BASEGO_NO_* env-var escape hatch so
 // tests can run hermetically. Production users leave them unset and get
@@ -21,7 +21,7 @@ import (
 // BASEGO_NO_GENERATE is unset, optionally runs `go mod tidy` when BASEGO_NO_TIDY is unset,
 // and optionally initializes a git repository with an initial commit when BASEGO_NO_GIT is unset.
 // Errors from each step are returned wrapped with a short prefix identifying the failing step.
-func PostWrite(target string, req *CreateRequest) error {
+func PostWrite(target string, req *CreateRequest, version string) error {
 	if err := runIn(target, "gofmt", "-w", "."); err != nil {
 		return fmt.Errorf("scaffold: gofmt: %w", err)
 	}
@@ -36,7 +36,7 @@ func PostWrite(target string, req *CreateRequest) error {
 		}
 	}
 	if os.Getenv("BASEGO_NO_GIT") == "" {
-		if err := initGitRepo(target); err != nil {
+		if err := initGitRepo(target, version); err != nil {
 			return fmt.Errorf("scaffold: git init: %w", err)
 		}
 	}
@@ -48,16 +48,17 @@ func PostWrite(target string, req *CreateRequest) error {
 // initGitRepo initializes a new Git repository in target on branch main, stages all files,
 // and creates an initial commit with a fixed author identity.
  // It runs `git init --initial-branch=main -q`, `git add .`, and
-// `git -c user.name=basego -c user.email=basego@localhost commit -q -m "initial scaffold from basego"`.
+// `git -c user.name=basego -c user.email=basego@localhost commit -q -m "initial scaffold from basego v<version>"`.
 // Returns any error produced while running these commands.
-func initGitRepo(target string) error {
+func initGitRepo(target, version string) error {
+	msg := fmt.Sprintf("initial scaffold from basego v%s", version)
 	for _, args := range [][]string{
 		{"init", "--initial-branch=main", "-q"},
 		{"add", "."},
 		{
 			"-c", "user.name=basego",
 			"-c", "user.email=basego@localhost",
-			"commit", "-q", "-m", "initial scaffold from basego",
+			"commit", "-q", "-m", msg,
 		},
 	} {
 		if err := runIn(target, "git", args...); err != nil {

@@ -127,8 +127,9 @@ func assertGitRepo(t *testing.T, target string) {
 		t.Errorf("git log failed: %v\n%s", err, out)
 		return
 	}
-	if !strings.Contains(string(out), "initial scaffold from basego") {
-		t.Errorf("initial commit missing; git log:\n%s", out)
+	// DESIGN §15: the commit records the generating basego version.
+	if !strings.Contains(string(out), "initial scaffold from basego v") {
+		t.Errorf("initial commit missing or lacks version marker; git log:\n%s", out)
 	}
 }
 
