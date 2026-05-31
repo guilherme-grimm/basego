@@ -21,12 +21,69 @@ import (
 // later. Fail fast at parse time instead.
 var tagRe = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
+// collectionRe matches `/<name>` — a flat collection path. itemRe matches
+// `/<name>/{param}` — a single-resource path. Both are conservative: they
+// don't recognize nested collections, since DESIGN §5's CRUD table only
+// covers the single-segment family. Anything outside falls back to
+// non-CRUD (panic stub).
+var (
+	collectionRe = regexp.MustCompile(`^/[A-Za-z][A-Za-z0-9_-]*$`)
+	itemRe       = regexp.MustCompile(`^/[A-Za-z][A-Za-z0-9_-]*/\{[A-Za-z][A-Za-z0-9_]*\}$`)
+)
+
 // Operation is the minimal view of one OpenAPI operation that basego
 // cares about at scaffold time.
 type Operation struct {
 	Method      string // upper-case (GET, POST, ...)
 	Path        string // raw OpenAPI path, e.g. /pets/{id}
 	OperationID string
+}
+
+// CRUDKind classifies an Operation against the six combos DESIGN §5
+// recognizes as CRUD. CRUDNone means non-CRUD — the codegen path emits
+// a panic stub for these so unfinished routes surface loudly.
+type CRUDKind string
+
+const (
+	CRUDNone          CRUDKind = ""
+	CRUDList          CRUDKind = "list"
+	CRUDCreate        CRUDKind = "create"
+	CRUDGetByID       CRUDKind = "get_by_id"
+	CRUDUpdate        CRUDKind = "update"
+	CRUDPartialUpdate CRUDKind = "partial_update"
+	CRUDDelete        CRUDKind = "delete"
+)
+
+// CRUD returns the operation's CRUD classification. Pure function of
+// Method + Path; no side effects.
+func (o Operation) CRUD() CRUDKind {
+	isCollection := collectionRe.MatchString(o.Path)
+	isItem := itemRe.MatchString(o.Path)
+	switch {
+	case o.Method == "GET" && isCollection:
+		return CRUDList
+	case o.Method == "POST" && isCollection:
+		return CRUDCreate
+	case o.Method == "GET" && isItem:
+		return CRUDGetByID
+	case o.Method == "PUT" && isItem:
+		return CRUDUpdate
+	case o.Method == "PATCH" && isItem:
+		return CRUDPartialUpdate
+	case o.Method == "DELETE" && isItem:
+		return CRUDDelete
+	}
+	return CRUDNone
+}
+
+// MethodName returns the Go method name to use for this operation in the
+// generated handler. OperationID is required (Parse rejects ops without
+// one), so this is a straight exportify of OperationID.
+func (o Operation) MethodName() string {
+	if o.OperationID == "" {
+		return ""
+	}
+	return strings.ToUpper(o.OperationID[:1]) + o.OperationID[1:]
 }
 
 // Slice groups operations by tag. One slice = one tag = one generated
@@ -112,6 +169,9 @@ func Parse(data []byte) (*Spec, error) {
 			tag := op.Tags[0]
 			if !tagRe.MatchString(tag) {
 				return nil, fmt.Errorf("oapi: tag %q is not a valid Go package name; basego requires lowercase letters and digits, starting with a letter", tag)
+			}
+			if strings.TrimSpace(op.OperationID) == "" {
+				return nil, fmt.Errorf("oapi: %s %s missing operationId — basego uses it to name the generated Go handler method", strings.ToUpper(method), pth)
 			}
 			byTag[tag] = append(byTag[tag], Operation{
 				Method:      strings.ToUpper(method),

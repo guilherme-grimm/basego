@@ -178,11 +178,21 @@ paths:
 	for _, rel := range []string{
 		"internal/api/openapi/spec.yaml",
 		"internal/api/openapi/pets/doc.go",
+		"internal/api/openapi/pets/handler.go",
 		"internal/api/openapi/orders/doc.go",
+		"internal/api/openapi/orders/handler.go",
 	} {
 		if _, err := os.Stat(filepath.Join(target, rel)); err != nil {
 			t.Errorf("missing %s: %v", rel, err)
 		}
+	}
+	// handler.go must contain a method matching the spec's operationId.
+	h, err := os.ReadFile(filepath.Join(target, "internal/api/openapi/pets/handler.go"))
+	if err != nil {
+		t.Fatalf("read pets/handler.go: %v", err)
+	}
+	if !strings.Contains(string(h), "func (h *Handler) ListPets(") {
+		t.Errorf("pets/handler.go missing ListPets method\n---\n%s", h)
 	}
 	// doc.go must carry the go:generate directive so `make generate`
 	// produces types_gen.go without further wiring.

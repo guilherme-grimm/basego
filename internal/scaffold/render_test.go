@@ -232,6 +232,74 @@ paths:
 	}
 }
 
+func TestRender_HandlerGoPerSlice(t *testing.T) {
+	t.Parallel()
+	spec, err := oapi.Parse([]byte(`
+openapi: 3.0.3
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      operationId: listPets
+    post:
+      tags: [pets]
+      operationId: createPet
+  /pets/{id}:
+    get:
+      tags: [pets]
+      operationId: getPet
+  /pets/search:
+    post:
+      tags: [pets]
+      operationId: searchPets
+`))
+	if err != nil {
+		t.Fatalf("oapi.Parse: %v", err)
+	}
+	req := &scaffold.CreateRequest{
+		Name: "demo", Module: "example.com/demo",
+		Drivers: []string{"memory"},
+		Spec:    spec, SpecBytes: []byte("openapi: 3.0.3\n"),
+	}
+	plan, err := scaffold.Render(req)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	var handler string
+	for _, f := range plan.Files {
+		if f.Path == "internal/api/openapi/pets/handler.go" {
+			handler = string(f.Content)
+		}
+	}
+	if handler == "" {
+		t.Fatal("pets/handler.go not in plan")
+	}
+	// CRUD ops get 501 placeholder.
+	for _, mustHave := range []string{
+		"package pets",
+		"func NewHandler() *Handler",
+		"func (h *Handler) ListPets(",
+		"(CRUD: list)",
+		"http.StatusNotImplemented",
+		"func (h *Handler) GetPet(",
+		"(CRUD: get_by_id)",
+	} {
+		if !strings.Contains(handler, mustHave) {
+			t.Errorf("handler missing %q\n---\n%s", mustHave, handler)
+		}
+	}
+	// Non-CRUD POST /pets/search panics.
+	for _, mustHave := range []string{
+		"func (h *Handler) SearchPets(",
+		"(non-CRUD)",
+		`panic("pets.Handler.SearchPets: not implemented")`,
+	} {
+		if !strings.Contains(handler, mustHave) {
+			t.Errorf("non-CRUD branch missing %q\n---\n%s", mustHave, handler)
+		}
+	}
+}
+
 func TestRender_NilRequest(t *testing.T) {
 	t.Parallel()
 	_, err := scaffold.Render(nil)

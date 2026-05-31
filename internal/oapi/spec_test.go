@@ -138,6 +138,55 @@ paths:
 	}
 }
 
+func TestParse_RejectsMissingOperationID(t *testing.T) {
+	t.Parallel()
+	_, err := oapi.Parse([]byte(`
+openapi: 3.0.3
+paths:
+  /pets:
+    get:
+      tags: [pets]
+`))
+	if err == nil || !strings.Contains(err.Error(), "missing operationId") {
+		t.Fatalf("Parse: err = %v, want 'missing operationId'", err)
+	}
+}
+
+func TestDetectCRUD(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		method, path string
+		want         oapi.CRUDKind
+	}{
+		{"GET", "/pets", oapi.CRUDList},
+		{"POST", "/pets", oapi.CRUDCreate},
+		{"GET", "/pets/{id}", oapi.CRUDGetByID},
+		{"PUT", "/pets/{id}", oapi.CRUDUpdate},
+		{"PATCH", "/pets/{id}", oapi.CRUDPartialUpdate},
+		{"DELETE", "/pets/{id}", oapi.CRUDDelete},
+		// non-CRUD shapes
+		{"POST", "/pets/{id}", oapi.CRUDNone},
+		{"GET", "/pets/{id}/photos", oapi.CRUDNone},
+		{"POST", "/pets/search", oapi.CRUDNone},
+		{"OPTIONS", "/pets", oapi.CRUDNone},
+		{"GET", "/", oapi.CRUDNone},
+	}
+	for _, tc := range tests {
+		op := oapi.Operation{Method: tc.method, Path: tc.path}
+		if got := op.CRUD(); got != tc.want {
+			t.Errorf("CRUD(%s %s) = %q, want %q", tc.method, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestOperation_MethodName(t *testing.T) {
+	t.Parallel()
+	op := oapi.Operation{OperationID: "listPets"}
+	if got := op.MethodName(); got != "ListPets" {
+		t.Errorf("MethodName = %q, want ListPets", got)
+	}
+}
+
 func TestParseFile_MissingFile(t *testing.T) {
 	t.Parallel()
 	_, err := oapi.ParseFile(filepath.Join(t.TempDir(), "nope.yaml"))
