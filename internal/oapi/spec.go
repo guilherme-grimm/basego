@@ -122,7 +122,7 @@ var httpMethods = map[string]bool{
 
 // ParseFile reads path, parses it, and returns a Spec. Untagged operations
 // fail with a specific error (DESIGN §6). Operations within a slice and
-// slices themselves are sorted for deterministic downstream output.
+// Spec.Source to the file's absolute path.
 func ParseFile(path string) (*Spec, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -141,7 +141,8 @@ func ParseFile(path string) (*Spec, error) {
 }
 
 // Parse decodes spec bytes into a Spec without any filesystem access.
-// Exposed for unit tests; production callers use ParseFile.
+// Parse decodes an OpenAPI v3 document from the provided YAML bytes and returns a Spec containing operations grouped into sorted slices by tag.
+// It validates that the `openapi` field is present, accepts only known HTTP methods, requires exactly one lowercase package-safe tag per operation, and requires a non-empty `operationId` for each operation; parsed operations are recorded with their method, path, and operationId, operations within a tag are sorted by path then method, and tag slices are sorted by tag. Error messages are returned when parsing or validation fails.
 func Parse(data []byte) (*Spec, error) {
 	var raw rawSpec
 	if err := yaml.Unmarshal(data, &raw); err != nil {

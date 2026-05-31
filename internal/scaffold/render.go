@@ -32,7 +32,15 @@ const (
 //
 // Templates ending in ".tmpl" are run through text/template with req as the
 // dot value. Other files are copied verbatim. The result is deterministic:
-// the Plan's file order is whatever validatePlan sorts it into in Write.
+// Render builds a Plan of files from the embedded templates and any OpenAPI-derived files required by req.
+// 
+// It walks the embedded templates directory, maps each template path to an output path, renders files
+// ending with the template suffix using req as the template data, and includes non-template files verbatim.
+// Files and entire driver subtrees are skipped according to mapTemplatePath. If req.Spec is present,
+// additional spec files (spec.yaml, per-tag doc.go and handler.go) are appended via specFiles.
+// 
+// If req is nil, Render returns an error. Any filesystem walk, read, template parse, or template execute
+// error is returned with contextual file information. The returned Plan.Target is set to req.Name.
 func Render(req *CreateRequest) (Plan, error) {
 	if req == nil {
 		return Plan{}, fmt.Errorf("scaffold: nil request")
@@ -82,7 +90,7 @@ func Render(req *CreateRequest) (Plan, error) {
 
 // specFiles emits the OAPI-derived files when the request carries a spec:
 // the spec itself (verbatim copy) and one placeholder doc.go per tag. Real
-// codegen wiring lands in a follow-up deliverable.
+//   - internal/api/openapi/<tag>/handler.go produced by renderHandlerGo(slice)
 func specFiles(req *CreateRequest) []File {
 	if req.Spec == nil {
 		return nil
@@ -134,6 +142,11 @@ func (h *Handler) {{.MethodName}}(w http.ResponseWriter, _ *http.Request) {
 }
 {{end}}`
 
+// renderHandlerGo renders the handler.go source for the given OpenAPI slice.
+// It returns the generated Go source as a string. If template execution fails
+// (which is treated as a programmer error because the template is constant and
+// the input is expected to be well-formed), the function panics with an
+// explanatory message.
 func renderHandlerGo(slice oapi.Slice) string {
 	t := template.Must(template.New("handler").Parse(handlerTemplate))
 	var buf bytes.Buffer
@@ -149,7 +162,10 @@ func renderHandlerGo(slice oapi.Slice) string {
 // declaration plus a //go:generate directive that invokes oapi-codegen on
 // demand via `go run pkg@version` — no tool dep is added to the generated
 // project's go.mod, so projects compile offline and only need network when
-// the user runs `make generate`.
+// renderDocGo returns the source text for a package-level doc.go for the named slice.
+// The generated doc.go declares package <tag>, documents how to regenerate generated
+// types, and embeds a //go:generate directive that invokes oapi-codegen pinned to
+// the scaffold's configured version to produce `types_gen.go` for the given tag from ../spec.yaml.
 func renderDocGo(tag string) string {
 	return "// Package " + tag + " holds the generated OpenAPI types and (in a\n" +
 		"// follow-up deliverable) server stubs for the " + tag + " slice.\n" +
