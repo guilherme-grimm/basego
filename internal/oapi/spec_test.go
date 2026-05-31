@@ -152,6 +152,26 @@ paths:
 	}
 }
 
+func TestParse_RejectsDuplicateMethodName(t *testing.T) {
+	t.Parallel()
+	// "listPets" and "ListPets" both export to the Go method "ListPets".
+	_, err := oapi.Parse([]byte(`
+openapi: 3.0.3
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      operationId: listPets
+  /pets/{id}:
+    get:
+      tags: [pets]
+      operationId: ListPets
+`))
+	if err == nil || !strings.Contains(err.Error(), "Go method") {
+		t.Fatalf("Parse: err = %v, want method-name collision error", err)
+	}
+}
+
 func TestDetectCRUD(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

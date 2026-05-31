@@ -152,6 +152,11 @@ func Parse(data []byte) (*Spec, error) {
 		return nil, fmt.Errorf("oapi: missing 'openapi' version field")
 	}
 	byTag := map[string][]Operation{}
+	// seenMethod tracks, per tag, the Go method name each operation maps to,
+	// so duplicate or first-letter-colliding operationIds (e.g. "foo" vs
+	// "Foo") are rejected here rather than producing duplicate method
+	// declarations that only fail when the generated project is compiled.
+	seenMethod := map[string]map[string]string{}
 	for pth, methods := range raw.Paths {
 		for method, node := range methods {
 			if !httpMethods[strings.ToLower(method)] {
@@ -174,11 +179,20 @@ func Parse(data []byte) (*Spec, error) {
 			if strings.TrimSpace(op.OperationID) == "" {
 				return nil, fmt.Errorf("oapi: %s %s missing operationId — basego uses it to name the generated Go handler method", strings.ToUpper(method), pth)
 			}
-			byTag[tag] = append(byTag[tag], Operation{
+			o := Operation{
 				Method:      strings.ToUpper(method),
 				Path:        pth,
 				OperationID: op.OperationID,
-			})
+			}
+			mn := o.MethodName()
+			if seenMethod[tag] == nil {
+				seenMethod[tag] = map[string]string{}
+			}
+			if prev, ok := seenMethod[tag][mn]; ok {
+				return nil, fmt.Errorf("oapi: tag %q operations %q and %q both map to Go method %q; operationIds must be unique per tag", tag, prev, op.OperationID, mn)
+			}
+			seenMethod[tag][mn] = op.OperationID
+			byTag[tag] = append(byTag[tag], o)
 		}
 	}
 	slices := make([]Slice, 0, len(byTag))
