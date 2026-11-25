@@ -11,8 +11,7 @@ import (
 //
 //  1. gofmt -w .                (canonical formatting, helps determinism)
 //  2. go generate ./...         (only when req.Spec is set — file ext used)
-//  3. go mod tidy               (resolve deps + write go.sum; skipping it
-//                                 leaves the project unbuildable)
+//  3. go mod tidy               (resolve deps + go.sum; required to build)
 //  4. git init + initial commit ("initial scaffold from basego v<version>")
 //
 // Each network-touching step honors a BASEGO_NO_* env-var escape hatch so
@@ -48,7 +47,7 @@ func PostWrite(target string, req *CreateRequest, version string) error {
 // commit. user.name/user.email are injected per-invocation so the user's
 // initGitRepo initializes a new Git repository in target on branch main, stages all files,
 // and creates an initial commit with a fixed author identity.
- // It runs `git init --initial-branch=main -q`, `git add .`, and
+// It runs `git init --initial-branch=main -q`, `git add .`, and
 // `git -c user.name=basego -c user.email=basego@localhost commit -q -m "initial scaffold from basego v<version>"`.
 // Returns any error produced while running these commands.
 func initGitRepo(target, version string) error {

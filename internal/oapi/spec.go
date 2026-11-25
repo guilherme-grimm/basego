@@ -208,4 +208,3 @@ func Parse(data []byte) (*Spec, error) {
 	sort.Slice(slices, func(i, j int) bool { return slices[i].Tag < slices[j].Tag })
 	return &Spec{Slices: slices}, nil
 }
-

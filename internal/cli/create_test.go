@@ -104,9 +104,9 @@ func TestParseCreate_Invalid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		args    []string
-		errHas  string
+		name   string
+		args   []string
+		errHas string
 	}{
 		{"missing name", []string{}, "missing project name"},
 		{"invalid name (leading digit)", []string{"9app"}, "invalid project name"},
