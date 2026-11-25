@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/guilherme-grimm/basego/internal/oapi"
 	"github.com/guilherme-grimm/basego/internal/scaffold"
 )
@@ -191,9 +194,7 @@ func TestRender_ObservabilityStack(t *testing.T) {
 	t.Parallel()
 	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}}
 	plan, err := scaffold.Render(req)
-	if err != nil {
-		t.Fatalf("Render: %v", err)
-	}
+	require.NoError(t, err)
 	files := make(map[string]string, len(plan.Files))
 	for _, f := range plan.Files {
 		files[f.Path] = string(f.Content)
@@ -205,9 +206,7 @@ func TestRender_ObservabilityStack(t *testing.T) {
 		"OBSERVABILITY_OTLP_ENDPOINT: otel-collector:4317",
 		"--web.enable-remote-write-receiver",
 	} {
-		if !strings.Contains(compose, s) {
-			t.Errorf("docker-compose.yml missing %q", s)
-		}
+		assert.Contains(t, compose, s, "docker-compose.yml")
 	}
 
 	stack := map[string]string{
@@ -218,17 +217,11 @@ func TestRender_ObservabilityStack(t *testing.T) {
 		"observability/grafana/datasources.yaml": "http://prometheus:9090",
 	}
 	for path, want := range stack {
-		got, ok := files[path]
-		if !ok {
-			t.Errorf("plan missing %s", path)
+		if !assert.Contains(t, files, path, "plan") {
 			continue
 		}
-		if !strings.Contains(got, want) {
-			t.Errorf("%s missing %q", path, want)
-		}
-		if !strings.Contains(compose, "./"+path+":") {
-			t.Errorf("docker-compose.yml does not mount %s", path)
-		}
+		assert.Contains(t, files[path], want, path)
+		assert.Contains(t, compose, "./"+path+":", "docker-compose.yml mount")
 	}
 }
 
