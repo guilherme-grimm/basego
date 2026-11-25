@@ -154,6 +154,34 @@ func TestRender_ConfigYAMLContainsSelectedResources(t *testing.T) {
 	}
 }
 
+func TestRender_RouterExposesMetrics(t *testing.T) {
+	t.Parallel()
+	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}}
+	plan, err := scaffold.Render(req)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	var router, cfg string
+	for _, f := range plan.Files {
+		switch f.Path {
+		case "internal/api/router.go":
+			router = string(f.Content)
+		case "config/config.yaml":
+			cfg = string(f.Content)
+		}
+	}
+	for _, s := range []string{"promhttp", `"GET /metrics"`} {
+		if !strings.Contains(router, s) {
+			t.Errorf("router.go missing %q\n---\n%s", s, router)
+		}
+	}
+	for _, s := range []string{"observability:", "service_name: demo", "metrics_path: /metrics"} {
+		if !strings.Contains(cfg, s) {
+			t.Errorf("config.yaml missing %q\n---\n%s", s, cfg)
+		}
+	}
+}
+
 func TestRender_DockerComposeServices(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
