@@ -403,7 +403,6 @@ log:
 observability:
   service_name: my-app
   otlp_endpoint: localhost:4317   # otel-collector; swap for a real backend
-  metrics_path: /metrics          # promhttp exposition scraped by Prometheus
   trace_sample_ratio: 1.0         # consumed once otel deep-wire lands (post-v1)
 
 resources:
