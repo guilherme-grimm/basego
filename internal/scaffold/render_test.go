@@ -154,7 +154,7 @@ func TestRender_ConfigYAMLContainsSelectedResources(t *testing.T) {
 	}
 }
 
-func TestRender_RouterExposesMetrics(t *testing.T) {
+func TestRender_MetricsRouteAndObservabilityConfig(t *testing.T) {
 	t.Parallel()
 	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}}
 	plan, err := scaffold.Render(req)
@@ -175,7 +175,7 @@ func TestRender_RouterExposesMetrics(t *testing.T) {
 			t.Errorf("router.go missing %q\n---\n%s", s, router)
 		}
 	}
-	for _, s := range []string{"observability:", "service_name: demo", "metrics_path: /metrics"} {
+	for _, s := range []string{"observability:", "service_name: demo", "otlp_endpoint:"} {
 		if !strings.Contains(cfg, s) {
 			t.Errorf("config.yaml missing %q\n---\n%s", s, cfg)
 		}

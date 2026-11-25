@@ -11,7 +11,8 @@ import (
 //
 //  1. gofmt -w .                (canonical formatting, helps determinism)
 //  2. go generate ./...         (only when req.Spec is set — file ext used)
-//  3. go mod tidy               (resolve deps; near-no-op on stdlib-only)
+//  3. go mod tidy               (resolve deps + write go.sum; skipping it
+//                                 leaves the project unbuildable)
 //  4. git init + initial commit ("initial scaffold from basego v<version>")
 //
 // Each network-touching step honors a BASEGO_NO_* env-var escape hatch so
