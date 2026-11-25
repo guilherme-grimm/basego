@@ -34,6 +34,11 @@ var baseFiles = []string{
 	"internal/resource/database/memory/store.go",
 	"internal/service/example/service.go",
 	"internal/service/example/service_test.go",
+	"observability/grafana/datasources.yaml",
+	"observability/loki.yaml",
+	"observability/otel-collector.yaml",
+	"observability/prometheus.yml",
+	"observability/tempo.yaml",
 }
 
 func TestRender_DriverMatrix(t *testing.T) {
@@ -178,6 +183,51 @@ func TestRender_MetricsRouteAndObservabilityConfig(t *testing.T) {
 	for _, s := range []string{"observability:", "service_name: demo", "otlp_endpoint:"} {
 		if !strings.Contains(cfg, s) {
 			t.Errorf("config.yaml missing %q\n---\n%s", s, cfg)
+		}
+	}
+}
+
+func TestRender_ObservabilityStack(t *testing.T) {
+	t.Parallel()
+	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}}
+	plan, err := scaffold.Render(req)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	files := make(map[string]string, len(plan.Files))
+	for _, f := range plan.Files {
+		files[f.Path] = string(f.Content)
+	}
+
+	compose := files["docker-compose.yml"]
+	for _, s := range []string{
+		"otel-collector:", "prometheus:", "loki:", "tempo:", "grafana:",
+		"OBSERVABILITY_OTLP_ENDPOINT: otel-collector:4317",
+		"--web.enable-remote-write-receiver",
+	} {
+		if !strings.Contains(compose, s) {
+			t.Errorf("docker-compose.yml missing %q", s)
+		}
+	}
+
+	stack := map[string]string{
+		"observability/prometheus.yml":           "app:8080",
+		"observability/otel-collector.yaml":      "tempo:4317",
+		"observability/loki.yaml":                "http_listen_port: 3100",
+		"observability/tempo.yaml":               "http_listen_port: 3200",
+		"observability/grafana/datasources.yaml": "http://prometheus:9090",
+	}
+	for path, want := range stack {
+		got, ok := files[path]
+		if !ok {
+			t.Errorf("plan missing %s", path)
+			continue
+		}
+		if !strings.Contains(got, want) {
+			t.Errorf("%s missing %q", path, want)
+		}
+		if !strings.Contains(compose, "./"+path+":") {
+			t.Errorf("docker-compose.yml does not mount %s", path)
 		}
 	}
 }
