@@ -33,12 +33,12 @@ const (
 // Templates ending in ".tmpl" are run through text/template with req as the
 // dot value. Other files are copied verbatim. The result is deterministic:
 // Render builds a Plan of files from the embedded templates and any OpenAPI-derived files required by req.
-// 
+//
 // It walks the embedded templates directory, maps each template path to an output path, renders files
 // ending with the template suffix using req as the template data, and includes non-template files verbatim.
 // Files and entire driver subtrees are skipped according to mapTemplatePath. If req.Spec is present,
 // additional spec files (spec.yaml, per-tag doc.go and handler.go) are appended via specFiles.
-// 
+//
 // If req is nil, Render returns an error. Any filesystem walk, read, template parse, or template execute
 // error is returned with contextual file information. The returned Plan.Target is set to req.Name.
 func Render(req *CreateRequest) (Plan, error) {
