@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/guilherme-grimm/basego/internal/oapi"
 	"github.com/guilherme-grimm/basego/internal/scaffold"
 )
@@ -34,6 +37,11 @@ var baseFiles = []string{
 	"internal/resource/database/memory/store.go",
 	"internal/service/example/service.go",
 	"internal/service/example/service_test.go",
+	"observability/grafana/datasources.yaml",
+	"observability/loki.yaml",
+	"observability/otel-collector.yaml",
+	"observability/prometheus.yml",
+	"observability/tempo.yaml",
 }
 
 func TestRender_DriverMatrix(t *testing.T) {
@@ -179,6 +187,41 @@ func TestRender_MetricsRouteAndObservabilityConfig(t *testing.T) {
 		if !strings.Contains(cfg, s) {
 			t.Errorf("config.yaml missing %q\n---\n%s", s, cfg)
 		}
+	}
+}
+
+func TestRender_ObservabilityStack(t *testing.T) {
+	t.Parallel()
+	req := &scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}}
+	plan, err := scaffold.Render(req)
+	require.NoError(t, err)
+	files := make(map[string]string, len(plan.Files))
+	for _, f := range plan.Files {
+		files[f.Path] = string(f.Content)
+	}
+
+	compose := files["docker-compose.yml"]
+	for _, s := range []string{
+		"otel-collector:", "prometheus:", "loki:", "tempo:", "grafana:",
+		"OBSERVABILITY_OTLP_ENDPOINT: otel-collector:4317",
+		"--web.enable-remote-write-receiver",
+	} {
+		assert.Contains(t, compose, s, "docker-compose.yml")
+	}
+
+	stack := map[string]string{
+		"observability/prometheus.yml":           "app:8080",
+		"observability/otel-collector.yaml":      "tempo:4317",
+		"observability/loki.yaml":                "http_listen_port: 3100",
+		"observability/tempo.yaml":               "http_listen_port: 3200",
+		"observability/grafana/datasources.yaml": "http://prometheus:9090",
+	}
+	for path, want := range stack {
+		if !assert.Contains(t, files, path, "plan") {
+			continue
+		}
+		assert.Contains(t, files[path], want, path)
+		assert.Contains(t, compose, "./"+path+":", "docker-compose.yml mount")
 	}
 }
 

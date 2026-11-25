@@ -1,5 +1,10 @@
 module github.com/guilherme-grimm/basego
 
-go 1.26.3
+go 1.27.4
 
-require gopkg.in/yaml.v3 v3.0.1 // indirect
+require (
+	github.com/stretchr/testify v1.12.1
+	gopkg.in/yaml.v3 v3.0.1
+)
+
+require go.yaml.in/yaml/v3 v3.0.5 // indirect
