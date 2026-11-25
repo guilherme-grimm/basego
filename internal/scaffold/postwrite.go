@@ -43,13 +43,10 @@ func PostWrite(target string, req *CreateRequest, version string) error {
 	return nil
 }
 
-// initGitRepo creates a fresh repo on `main` and stages the initial
-// commit. user.name/user.email are injected per-invocation so the user's
-// initGitRepo initializes a new Git repository in target on branch main, stages all files,
-// and creates an initial commit with a fixed author identity.
-// It runs `git init --initial-branch=main -q`, `git add .`, and
-// `git -c user.name=basego -c user.email=basego@localhost commit -q -m "initial scaffold from basego v<version>"`.
-// Returns any error produced while running these commands.
+// initGitRepo creates a fresh repo on `main` in target, stages everything, and
+// records the initial commit ("initial scaffold from basego v<version>").
+// The author identity (basego <basego@localhost>) is injected per-invocation
+// via `git -c`, so it neither reads nor touches the user's git config.
 func initGitRepo(target, version string) error {
 	msg := fmt.Sprintf("initial scaffold from basego v%s", version)
 	for _, args := range [][]string{
