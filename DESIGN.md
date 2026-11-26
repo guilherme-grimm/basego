@@ -479,6 +479,7 @@ Brownfield counterpart to `create`: extends an existing basego project on explic
 ### Scope
 
 - Targets **basego projects only**: created by `basego create` and still on the layout contract (ADR 0001). Never arbitrary Go modules.
+- A project without `.basego.yaml`, including anything created before D11, is not a basego project and `add` refuses it. There is no adoption command; pre-v1 there are no outside users.
 - Adds **resources**, never business logic. Where a mature generator exists (oapi-codegen, sqlc), basego orchestrates it. Where none exists, basego publishes its own (ADR 0003).
 - `basego add <driver>` adds the resource only: client, `Deps` field + setup, config block, compose service, generator setup with an empty spec. It never touches existing services, and its files are the same templates `create --db=<driver>` renders.
 - `basego add service <name>` and reconciling existing specs with services are out of D11 (see PLAN D12).
@@ -487,12 +488,12 @@ Brownfield counterpart to `create`: extends an existing basego project on explic
 
 - `create` writes `.basego.yaml`: basego version, layout contract version, and SHA-256 baseline hashes (over gofmt-normalised content) for **taken-over** files only. A fresh project hashes nothing.
 - Current resources, drivers and services are read from the file tree, never from the manifest.
-- `basego check` reports drift per file and can fail CI; a re-baseline step records intentional edits. Drift is never an error for `add`: it stops editing the drifted file and prints the snippet to paste.
+- `basego check` reports drift per file and can fail CI; a re-baseline step records intentional edits. Drift is never an error and does not change `add`'s behaviour.
 
 ### Wiring (ADR 0004)
 
 - `cmd/api/deps_gen.go` and `cmd/api/services_gen.go` are regenerated from the file tree in sorted order. A service's driver switch gets a `case` only for drivers it has an adapter file for, so selecting an unsupported driver hits the loud `unknown driver` error, never a panicking stub.
-- Removing a generated header **takes over** the file: it stops being regenerated and gains a baseline hash.
+- Removing a generated header **takes over** the file: it stops being regenerated and gains a baseline hash. `add` never edits a taken-over file, drifted or not; it prints the snippet to paste.
 - Hand-owned YAML (`config/config.yaml`, `docker-compose.yml`) is edited by inserting missing keys only, preserving comments. An existing key in a different shape makes `add` refuse with a snippet. No hashes needed.
 
 ### Generators (ADR 0003)

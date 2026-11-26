@@ -1,8 +1,8 @@
 # Go wiring is generated, not hand-owned
 
-`cmd/api/deps.go` and `cmd/api/services.go` become `deps_gen.go` and `services_gen.go`, regenerated from the project's file tree: drivers under `internal/resource/*` and services under `internal/service/*`, read in sorted order so the same tree always produces the same wiring. `basego add` never parses or rewrites hand-written Go. The only hand-owned files it edits are `config/config.yaml` and `docker-compose.yml`, through comment-preserving YAML node edits, and those two are the manifest's wiring files.
+`cmd/api/deps.go` and `cmd/api/services.go` become `deps_gen.go` and `services_gen.go`, regenerated from the project's file tree: drivers under `internal/resource/*` and services under `internal/service/*`, read in sorted order so the same tree always produces the same wiring. `basego add` never parses or rewrites hand-written Go. The only hand-owned files it edits are `config/config.yaml` and `docker-compose.yml`, through comment-preserving YAML node edits.
 
-A user who wants custom wiring takes over a generated file by removing its `// Code generated` header. From then on it is a hand-owned wiring file under the drift rules (ADR 0002), and `add` prints the snippet to paste instead of regenerating it.
+A user who wants custom wiring takes over a generated file by removing its `// Code generated` header. From then on it is a hand-owned wiring file tracked for drift (ADR 0002). `add` never edits it, drifted or not, and prints the snippet to paste instead.
 
 ## Considered Options
 

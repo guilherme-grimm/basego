@@ -2,7 +2,7 @@
 
 `basego create` writes `.basego.yaml`, holding the basego version, the layout contract version, and one SHA-256 baseline hash per **taken-over** generated file. Hashes are taken over gofmt-normalised content. A project's current resources and drivers are read from the filesystem, never stored in the manifest, so the manifest cannot drift from reality when someone deletes a driver directory by hand.
 
-The model follows sqlx's offline mode: the manifest is the baseline, `basego check` reports drift per file (optionally failing CI), and an explicit re-baseline step records intentional edits. Unlike sqlx, drift is not an error, because editing hand-owned code is legitimate in a project that owns itself. Instead, `basego add` stops editing a drifted file automatically and prints the snippet to paste.
+The model follows sqlx's offline mode: the manifest is the baseline, `basego check` reports drift per file (optionally failing CI), and an explicit re-baseline step records intentional edits. Unlike sqlx, drift is not an error, because editing hand-owned code is legitimate in a project that owns itself. Drift does not change what `basego add` does: it never edits a taken-over file, drifted or not, and prints the snippet to paste (ADR 0004).
 
 The hand-owned YAML files `add` edits (`config/config.yaml`, `docker-compose.yml`) are **not** hashed. They are edited constantly by hand, so hashing them would make `add` fall back to snippets almost every time. They are protected by how they are edited: `add` only inserts keys that are missing, never modifies existing nodes, and refuses with a snippet when the key already exists in a different shape. Inserting a key cannot clobber a hand edit, so drift does not apply.
 

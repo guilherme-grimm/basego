@@ -20,7 +20,7 @@ Extending an existing **basego project** that may have evolved by hand since it 
 _Avoid_: legacy, existing repo
 
 **Resource**:
-A piece of reusable infrastructure a **basego project** talks to, such as a database, message broker or queue. `basego add` only ever adds resources and never business logic.
+A piece of reusable infrastructure a **basego project** talks to, such as a database, message broker or queue. `basego add <driver>` adds resources only, never business logic.
 _Avoid_: module (clashes with Go modules), plugin, integration
 
 **Driver**:
@@ -40,11 +40,11 @@ A pinned, standalone tool that turns a **spec** into code and runs via `go gener
 _Avoid_: codegen plugin, template
 
 **Manifest**:
-The `.basego.yaml` file that marks a project as a **basego project**. It records the basego version, the **layout contract** version and a baseline hash per **taken-over** file.
+The `.basego.yaml` file that marks a project as a **basego project**; `add` refuses a project without one. It records the basego version, the **layout contract** version and a baseline hash per **taken-over** file.
 _Avoid_: lockfile, state file
 
 **Wiring file**:
-A hand-owned file that `basego add` may edit to connect a new **resource**: `config/config.yaml` and `docker-compose.yml`, plus any **generated wiring** a user has **taken over**. Only taken-over files carry a baseline hash; `add` edits the YAML ones by inserting missing keys only, so they cannot **drift**.
+A hand-owned file involved in connecting a new **resource**: `config/config.yaml` and `docker-compose.yml`, plus any **generated wiring** a user has **taken over**. `add` edits the YAML ones by inserting missing keys only, so they carry no hash and cannot **drift**. It never edits taken-over Go; it prints the snippet to paste instead.
 _Avoid_: core module, glue
 
 **Generated wiring**:
@@ -56,7 +56,7 @@ Removing the generated header from a generated file so it becomes hand-owned. A 
 _Avoid_: eject, fork
 
 **Drift**:
-A **taken-over** file whose content no longer matches its baseline hash in the **manifest**, meaning it was edited outside basego. Drift is reported, never treated as an error, and `basego add` stops editing a drifted file automatically.
+A **taken-over** file whose content no longer matches its baseline hash in the **manifest**, meaning it was edited outside basego. Drift is reported by `basego check`, never treated as an error, and does not change what `add` does: `add` never edits a taken-over file either way.
 _Avoid_: tampering, corruption
 
 ## Flagged ambiguities
@@ -72,6 +72,6 @@ _Avoid_: tampering, corruption
 > **Dev:** It was created with basego, but we've rewritten half of it since.
 > **Domain expert:** That's still **brownfield** and still in scope, as long as the **layout contract** holds.
 > **Dev:** We **took over** `services_gen.go` and customised it. Will `basego add kafka` overwrite it?
-> **Domain expert:** No. Your edits are **drift**, so `add` prints the wiring for you to paste and leaves the file alone. The kafka **spec** and its generated code are new files, and the **generator** is pinned, so `go generate` keeps working without basego.
+> **Domain expert:** No. `add` never edits a taken-over file, so it prints the wiring for you to paste and leaves the file alone. Your edits show up as **drift** in `basego check`. The kafka **spec** and its generated code are new files, and the **generator** is pinned, so `go generate` keeps working without basego.
 > **Dev:** And our heavily edited `config.yaml`?
 > **Domain expert:** `add` only inserts the missing `resources.kafka` block, so your edits are safe without any hash.
