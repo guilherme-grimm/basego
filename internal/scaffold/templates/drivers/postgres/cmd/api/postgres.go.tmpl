@@ -15,8 +15,6 @@ func SetupPostgres(_ context.Context, _ PostgresConfig) (*postgres.Pool, error) 
 }
 
 // PostgresConfig mirrors the resources.postgres block in config.yaml.
-// Resolved from Viper in a later deliverable; declared here so the setup
-// signature is stable across PRs.
 type PostgresConfig struct {
-	DSN string
+	DSN string `mapstructure:"dsn"`
 }

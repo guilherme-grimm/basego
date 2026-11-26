@@ -76,6 +76,8 @@ func TestCreate_GeneratedProjectBuilds(t *testing.T) {
 				"docker-compose.yml",
 				"go.mod",
 				"cmd/api/main.go",
+				"cmd/api/config.go",
+				"cmd/api/logger.go",
 				"cmd/api/memory.go",
 				"cmd/api/deps.go",
 				"cmd/api/services.go",

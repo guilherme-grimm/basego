@@ -1,0 +1,72 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/spf13/viper"
+)
+
+// defaultConfigPath is relative to the working directory; override with
+// CONFIG_PATH.
+const defaultConfigPath = "config/config.yaml"
+
+// Config mirrors config/config.yaml. Any key can be overridden by an env
+// var named after its path: server.port → SERVER_PORT,
+// resources.postgres.dsn → RESOURCES_POSTGRES_DSN.
+type Config struct {
+	Server        ServerConfig        `mapstructure:"server"`
+	Log           LogConfig           `mapstructure:"log"`
+	Observability ObservabilityConfig `mapstructure:"observability"`
+	Service       ServiceConfig       `mapstructure:"service"`
+	Resources     ResourcesConfig     `mapstructure:"resources"`
+}
+
+type ServerConfig struct {
+	Port            int           `mapstructure:"port"`
+	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
+}
+
+type LogConfig struct {
+	Level string `mapstructure:"level"`
+	JSON  bool   `mapstructure:"json"`
+}
+
+type ObservabilityConfig struct {
+	ServiceName      string  `mapstructure:"service_name"`
+	OTLPEndpoint     string  `mapstructure:"otlp_endpoint"`
+	TraceSampleRatio float64 `mapstructure:"trace_sample_ratio"`
+}
+
+// LoadConfig reads the YAML file at path, applies env overrides and
+// validates the result.
+func LoadConfig(path string) (Config, error) {
+	v := viper.New()
+	v.SetConfigFile(path)
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+	if err := v.ReadInConfig(); err != nil {
+		return Config{}, fmt.Errorf("read config %s: %w", path, err)
+	}
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		return Config{}, fmt.Errorf("decode config %s: %w", path, err)
+	}
+	if cfg.Server.Port <= 0 {
+		return Config{}, fmt.Errorf("config %s: server.port must be positive, got %d", path, cfg.Server.Port)
+	}
+	if cfg.Server.ShutdownTimeout <= 0 {
+		return Config{}, fmt.Errorf("config %s: server.shutdown_timeout must be positive", path)
+	}
+	return cfg, nil
+}
+
+// configPath returns CONFIG_PATH when set, else defaultConfigPath.
+func configPath() string {
+	if p := os.Getenv("CONFIG_PATH"); p != "" {
+		return p
+	}
+	return defaultConfigPath
+}

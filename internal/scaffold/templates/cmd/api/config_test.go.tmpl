@@ -1,0 +1,62 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func writeConfig(t *testing.T, body string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestLoadConfig_ShippedFile(t *testing.T) {
+	cfg, err := LoadConfig(filepath.Join("..", "..", defaultConfigPath))
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Server.Port != 8080 || cfg.Server.ShutdownTimeout != 30*time.Second {
+		t.Errorf("server = %+v, want port 8080, timeout 30s", cfg.Server)
+	}
+	if !cfg.Service.Example.Enabled || cfg.Service.Example.Driver != "memory" {
+		t.Errorf("service.example = %+v, want enabled memory", cfg.Service.Example)
+	}
+}
+
+func TestLoadConfig_EnvOverride(t *testing.T) {
+	p := writeConfig(t, "server:\n  port: 8080\n  shutdown_timeout: 5s\nservice:\n  example:\n    driver: memory\n")
+	t.Setenv("SERVER_PORT", "9090")
+	t.Setenv("SERVICE_EXAMPLE_DRIVER", "other")
+	cfg, err := LoadConfig(p)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Server.Port != 9090 {
+		t.Errorf("port = %d, want 9090 from env", cfg.Server.Port)
+	}
+	if cfg.Service.Example.Driver != "other" {
+		t.Errorf("driver = %q, want %q from env", cfg.Service.Example.Driver, "other")
+	}
+}
+
+func TestLoadConfig_Invalid(t *testing.T) {
+	tests := map[string]string{
+		"missing file": filepath.Join(t.TempDir(), "nope.yaml"),
+		"zero port":    writeConfig(t, "server:\n  port: 0\n  shutdown_timeout: 5s\n"),
+		"no timeout":   writeConfig(t, "server:\n  port: 8080\n"),
+		"bad duration": writeConfig(t, "server:\n  port: 8080\n  shutdown_timeout: soon\n"),
+	}
+	for name, p := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := LoadConfig(p); err == nil {
+				t.Error("LoadConfig: want error, got nil")
+			}
+		})
+	}
+}

@@ -22,6 +22,17 @@ type Deps struct {
 {{- end }}
 }
 
+// ResourcesConfig mirrors the resources block in config.yaml: one entry per
+// selected driver. Memory needs no config.
+type ResourcesConfig struct {
+{{- if .HasDriver "mongo" }}
+	Mongo MongoConfig `mapstructure:"mongo"`
+{{- end }}
+{{- if .HasDriver "postgres" }}
+	Postgres PostgresConfig `mapstructure:"postgres"`
+{{- end }}
+}
+
 // buildDeps wires the in-process resources. Real mongo/postgres dials are
 // deferred until scaffold-time `go mod tidy` lands (Del 8); their fields
 // stay nil for now and only the memory driver is reachable at runtime.

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,21 +14,27 @@ import (
 	"{{.Module}}/internal/api"
 )
 
-const (
-	addr            = ":8080"
-	shutdownTimeout = 30 * time.Second
-)
-
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	cfg, err := LoadConfig(configPath())
+	if err != nil {
+		slog.Error("load config", "err", err)
+		os.Exit(1)
+	}
+	logger, err := newLogger(cfg.Log)
+	if err != nil {
+		slog.Error("build logger", "err", err)
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	deps := buildDeps()
-	if _, err := buildServices(deps, defaultServiceConfig(), logger); err != nil {
+	if _, err := buildServices(deps, cfg.Service, logger); err != nil {
 		logger.Error("wire services", "err", err)
 		os.Exit(1)
 	}
+
+	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 
 	srv := &http.Server{
 		Addr:              addr,
@@ -45,7 +52,7 @@ func main() {
 
 	<-ctx.Done()
 	logger.Info("shutting down")
-	shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	shutCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutCtx); err != nil {
 		logger.Error("shutdown", "err", err)

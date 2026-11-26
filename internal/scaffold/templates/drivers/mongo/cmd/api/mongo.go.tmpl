@@ -14,10 +14,8 @@ func SetupMongo(_ context.Context, _ MongoConfig) (*mongo.Client, error) {
 	return nil, errors.New("mongo setup not implemented yet")
 }
 
-// MongoConfig mirrors the resources.mongo block in config.yaml. Resolved
-// from Viper in a later deliverable; declared here so the setup signature
-// is stable across PRs.
+// MongoConfig mirrors the resources.mongo block in config.yaml.
 type MongoConfig struct {
-	URI      string
-	Database string
+	URI      string `mapstructure:"uri"`
+	Database string `mapstructure:"database"`
 }
