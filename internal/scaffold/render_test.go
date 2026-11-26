@@ -18,7 +18,10 @@ var baseFiles = []string{
 	"Makefile",
 	"README.md",
 	"docker-compose.yml",
+	"cmd/api/config.go",
+	"cmd/api/config_test.go",
 	"cmd/api/deps.go",
+	"cmd/api/logger.go",
 	"cmd/api/main.go",
 	"cmd/api/memory.go",
 	"cmd/api/services.go",
@@ -143,6 +146,41 @@ func TestRender_ConfigYAMLContainsSelectedResources(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRender_ResourcesConfigPerDriver(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		drivers     []string
+		mustContain []string
+		mustNot     []string
+	}{
+		{"memory only", []string{"memory"}, []string{"type ResourcesConfig struct"}, []string{"MongoConfig", "PostgresConfig"}},
+		{"mongo", []string{"memory", "mongo"}, []string{"Mongo MongoConfig `mapstructure:\"mongo\"`"}, []string{"PostgresConfig"}},
+		{"postgres", []string{"memory", "postgres"}, []string{"Postgres PostgresConfig `mapstructure:\"postgres\"`"}, []string{"MongoConfig"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			plan, err := scaffold.Render(&scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: tc.drivers})
+			require.NoError(t, err)
+			deps := fileContent(t, plan, "cmd/api/deps.go")
+			for _, s := range tc.mustContain {
+				assert.Contains(t, deps, s)
+			}
+			for _, s := range tc.mustNot {
+				assert.NotContains(t, deps, s)
+			}
+		})
+	}
+}
+
+func TestRender_DockerfileShipsConfig(t *testing.T) {
+	t.Parallel()
+	plan, err := scaffold.Render(&scaffold.CreateRequest{Name: "demo", Module: "example.com/demo", Drivers: []string{"memory"}})
+	require.NoError(t, err)
+	assert.Contains(t, fileContent(t, plan, "Dockerfile"), "COPY --from=build /src/config/config.yaml /config/config.yaml")
 }
 
 func TestRender_MetricsRouteAndObservabilityConfig(t *testing.T) {
@@ -378,4 +416,17 @@ func TestRender_NilRequest(t *testing.T) {
 	t.Parallel()
 	_, err := scaffold.Render(nil)
 	require.ErrorContains(t, err, "nil request")
+}
+
+// fileContent returns the rendered content of path in plan, failing the test
+// when the plan does not contain it.
+func fileContent(t *testing.T, plan scaffold.Plan, path string) string {
+	t.Helper()
+	for _, f := range plan.Files {
+		if f.Path == path {
+			return string(f.Content)
+		}
+	}
+	require.FailNow(t, "file not in plan", path)
+	return ""
 }

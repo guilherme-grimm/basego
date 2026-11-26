@@ -20,20 +20,16 @@ type Services struct {
 	Example *exampleservice.Service
 }
 
-// ServiceConfig is the minimal stand-in for the viper-backed config until
-// Del 8 wires real config loading. Defaults match config/config.yaml.
+// ServiceConfig mirrors the service block in config.yaml: one entry per
+// service slice.
 type ServiceConfig struct {
-	Example struct {
-		Enabled bool
-		Driver  string
-	}
+	Example ServiceEntry `mapstructure:"example"`
 }
 
-func defaultServiceConfig() ServiceConfig {
-	var c ServiceConfig
-	c.Example.Enabled = true
-	c.Example.Driver = "memory"
-	return c
+// ServiceEntry toggles a service and picks the driver backing its gateway.
+type ServiceEntry struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Driver  string `mapstructure:"driver"`
 }
 
 // buildServices is the one place that knows the wiring graph

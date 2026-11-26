@@ -14,6 +14,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /app ./cmd/api
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /app /app
+COPY --from=build /src/config/config.yaml /config/config.yaml
+WORKDIR /
 EXPOSE 8080
 USER nonroot:nonroot
 ENTRYPOINT ["/app"]
