@@ -62,6 +62,13 @@ func TestRender_DriverMatrix(t *testing.T) {
 			"cmd/api/postgres.go",
 			"internal/resource/database/postgres/client.go",
 			"internal/resource/database/postgres/example.go",
+			"internal/resource/database/postgres/example_test.go",
+			"internal/resource/database/postgres/queries/example.sql",
+			"internal/resource/database/postgres/schema/001_example.sql",
+			"internal/resource/database/postgres/sqlc.yaml",
+			"internal/resource/database/postgres/sqlcgen/db_gen.go",
+			"internal/resource/database/postgres/sqlcgen/example.sql_gen.go",
+			"internal/resource/database/postgres/sqlcgen/models_gen.go",
 		}},
 		{"with both", []string{"memory", "mongo", "postgres"}, []string{
 			"cmd/api/mongo.go",
@@ -70,6 +77,13 @@ func TestRender_DriverMatrix(t *testing.T) {
 			"internal/resource/database/mongo/example.go",
 			"internal/resource/database/postgres/client.go",
 			"internal/resource/database/postgres/example.go",
+			"internal/resource/database/postgres/example_test.go",
+			"internal/resource/database/postgres/queries/example.sql",
+			"internal/resource/database/postgres/schema/001_example.sql",
+			"internal/resource/database/postgres/sqlc.yaml",
+			"internal/resource/database/postgres/sqlcgen/db_gen.go",
+			"internal/resource/database/postgres/sqlcgen/example.sql_gen.go",
+			"internal/resource/database/postgres/sqlcgen/models_gen.go",
 		}},
 	}
 
@@ -263,7 +277,7 @@ func TestRender_DockerComposeServices(t *testing.T) {
 		{
 			"both DBs present",
 			[]string{"memory", "mongo", "postgres"},
-			[]string{"mongo:", "postgres:", "image: postgres:16", "RESOURCES_POSTGRES_DSN: postgres://"},
+			[]string{"mongo:", "postgres:", "image: postgres:16", "RESOURCES_POSTGRES_DSN: postgres://", "./internal/resource/database/postgres/schema:/docker-entrypoint-initdb.d:ro"},
 			nil,
 		},
 	}

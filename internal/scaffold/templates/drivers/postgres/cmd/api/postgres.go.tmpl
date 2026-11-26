@@ -2,19 +2,30 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"time"
 
-	"{{.Module}}/internal/resource/database/postgres"
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"github.com/jmoiron/sqlx"
 )
-
-// SetupPostgres dials Postgres using the configured DSN. The real driver
-// dependency (pgxpool) lands in a follow-up; the signature is fixed now so
-// services.go can be generated against it.
-func SetupPostgres(_ context.Context, _ PostgresConfig) (*postgres.Pool, error) {
-	return nil, errors.New("postgres setup not implemented yet")
-}
 
 // PostgresConfig mirrors the resources.postgres block in config.yaml.
 type PostgresConfig struct {
 	DSN string `mapstructure:"dsn"`
+}
+
+// SetupPostgres opens a pgx-backed sqlx pool and pings it, so a bad DSN or
+// unreachable server fails at startup instead of on the first query.
+func SetupPostgres(ctx context.Context, cfg PostgresConfig) (*sqlx.DB, error) {
+	db, err := sqlx.Open("pgx", cfg.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("open: %w", err)
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping: %w", err)
+	}
+	return db, nil
 }
