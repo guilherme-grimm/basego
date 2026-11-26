@@ -63,7 +63,7 @@ my-app/
 │       ├── tracer.go           # otel tracer provider
 │       ├── memory.go           # SetupMemory() *memory.Store
 │       ├── mongo.go            # SetupMongo(cfg) (*mongo.Client, error)
-│       ├── postgres.go         # SetupPostgres(cfg) (*pgxpool.Pool, error)
+│       ├── postgres.go         # SetupPostgres(ctx, cfg) (*sqlx.DB, error) — pgx stdlib
 │       └── services.go         # buildServices(deps, cfg) — the only file that knows the wiring graph
 ├── internal/
 │   ├── api/

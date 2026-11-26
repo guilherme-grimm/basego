@@ -47,6 +47,9 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
       POSTGRES_DB: {{.Name}}
+    volumes:
+      # Applied on first start only; `docker compose down -v` to re-apply.
+      - ./internal/resource/database/postgres/schema:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:

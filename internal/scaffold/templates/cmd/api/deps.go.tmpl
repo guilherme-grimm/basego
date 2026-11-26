@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
+{{- if .HasDriver "postgres" }}
+	"errors"
+	"fmt"
+
+	"github.com/jmoiron/sqlx"
+{{- end }}
+
 	memresource "{{.Module}}/internal/resource/database/memory"
 {{- if .HasDriver "mongo" }}
 	mongoresource "{{.Module}}/internal/resource/database/mongo"
-{{- end }}
-{{- if .HasDriver "postgres" }}
-	pgresource "{{.Module}}/internal/resource/database/postgres"
 {{- end }}
 )
 
@@ -18,7 +23,7 @@ type Deps struct {
 	Mongo *mongoresource.Client
 {{- end }}
 {{- if .HasDriver "postgres" }}
-	Postgres *pgresource.Pool
+	Postgres *sqlx.DB
 {{- end }}
 }
 
@@ -33,11 +38,33 @@ type ResourcesConfig struct {
 {{- end }}
 }
 
-// buildDeps wires the in-process resources. Real mongo/postgres dials are
-// deferred until scaffold-time `go mod tidy` lands (Del 8); their fields
-// stay nil for now and only the memory driver is reachable at runtime.
-func buildDeps() Deps {
-	return Deps{
-		Memory: SetupMemory(),
+// buildDeps dials every selected resource and fails fast when one is
+// unreachable. On error, resources already opened are closed.
+func buildDeps(ctx context.Context, cfg ResourcesConfig) (Deps, error) {
+	d := Deps{Memory: SetupMemory()}
+{{- if .HasDriver "postgres" }}
+
+	pg, err := SetupPostgres(ctx, cfg.Postgres)
+	if err != nil {
+		return Deps{}, errors.Join(fmt.Errorf("setup postgres: %w", err), d.Close())
 	}
+	d.Postgres = pg
+{{- end }}
+
+	return d, nil
+}
+
+// Close releases every opened resource in reverse setup order.
+func (d Deps) Close() error {
+{{- if .HasDriver "postgres" }}
+	var errs []error
+	if d.Postgres != nil {
+		if err := d.Postgres.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close postgres: %w", err))
+		}
+	}
+	return errors.Join(errs...)
+{{- else }}
+	return nil
+{{- end }}
 }

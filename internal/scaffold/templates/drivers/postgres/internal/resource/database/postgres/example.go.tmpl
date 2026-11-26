@@ -2,23 +2,43 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	"github.com/jmoiron/sqlx"
 
 	exampleentity "{{.Module}}/internal/domain/entity/example"
+	"{{.Module}}/internal/resource/database/postgres/sqlcgen"
 )
 
-// ExampleRepo is the postgres impl placeholder. Real wiring (sqlx + sqlc)
-// lands when scaffold-time `go mod tidy` is in place; methods panic until
-// then so a runtime route to postgres surfaces loudly.
+// ExampleRepo is the postgres implementation of the example slice's Repo
+// port, backed by the sqlc queries in queries/example.sql.
 type ExampleRepo struct {
-	pool *Pool
+	q *sqlcgen.Queries
 }
 
-func NewExampleRepo(pool *Pool) *ExampleRepo { return &ExampleRepo{pool: pool} }
-
-func (r *ExampleRepo) Save(context.Context, *exampleentity.Example) error {
-	panic("postgres.ExampleRepo.Save: not implemented")
+// NewExampleRepo returns a Repo bound to db. Wired in cmd/api/services.go.
+func NewExampleRepo(db *sqlx.DB) *ExampleRepo {
+	return &ExampleRepo{q: sqlcgen.New(db)}
 }
 
-func (r *ExampleRepo) FindByID(context.Context, string) (*exampleentity.Example, error) {
-	panic("postgres.ExampleRepo.FindByID: not implemented")
+// Save upserts e by ID.
+func (r *ExampleRepo) Save(ctx context.Context, e *exampleentity.Example) error {
+	if err := r.q.UpsertExample(ctx, sqlcgen.UpsertExampleParams{ID: e.ID, Name: e.Name}); err != nil {
+		return fmt.Errorf("postgres: save example %s: %w", e.ID, err)
+	}
+	return nil
+}
+
+// FindByID returns the example or exampleentity.ErrNotFound.
+func (r *ExampleRepo) FindByID(ctx context.Context, id string) (*exampleentity.Example, error) {
+	row, err := r.q.GetExample(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, exampleentity.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: find example %s: %w", id, err)
+	}
+	return &exampleentity.Example{ID: row.ID, Name: row.Name}, nil
 }

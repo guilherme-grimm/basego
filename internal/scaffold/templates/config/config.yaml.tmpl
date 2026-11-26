@@ -24,6 +24,6 @@ resources:
 {{- end}}
 {{- if .HasDriver "postgres"}}
   postgres:
-    dsn: postgres://user:pass@localhost:5432/{{.Name}}
+    dsn: postgres://user:pass@localhost:5432/{{.Name}}?sslmode=disable
 {{- end}}
 {{- end}}
